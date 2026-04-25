@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Add Card — UI/UX Mockup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy:#1B2A4A; --navy2:#243459; --accent:#4A90E2;
+    --green:#4CAF50; --red:#F44336; --blue:#2196F3; --orange:#FF9800;
+    --bg:#F0F2F7; --card:#FFFFFF; --border:#E0E4EE;
+    --text:#1A2030; --muted:#6B7694;
+    --radius:10px; --shadow:0 2px 12px rgba(27,42,74,.10);
+  }
+  html,body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+  /* ── Top nav (matches existing app) ──────────────────────── */
+  .topbar{background:var(--navy);display:flex;align-items:center;justify-content:space-between;
+          padding:0 24px;height:56px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .brand{display:flex;align-items:center;gap:10px;color:#fff;font-weight:700;font-size:16px}
+  .brand-icon{font-size:22px}
+  .nav-tabs{display:flex;gap:2px}
+  .nav-tab{padding:0 18px;height:56px;display:flex;align-items:center;
+           color:rgba(255,255,255,.65);cursor:pointer;font-size:13px;font-weight:500;
+           border-bottom:3px solid transparent;white-space:nowrap}
+  .nav-tab.active{color:#fff;border-bottom-color:var(--accent)}
+  .nav-tab.add{color:#fff;background:rgba(74,144,226,.18)}
+  .nav-tab.add.active{border-bottom-color:var(--green)}
+
+  /* ── Page shell ──────────────────────────────────────────── */
+  .main{max-width:1100px;margin:0 auto;padding:24px 20px}
+  .state-heading{font-size:11px;color:var(--muted);text-transform:uppercase;
+                 letter-spacing:.8px;margin-bottom:12px;font-weight:700}
+  .state-heading::before{content:'▸ ';color:var(--accent)}
+
+  /* ── Shared panel ───────────────────────────────────────── */
+  .panel{background:var(--card);border-radius:var(--radius);padding:28px;
+         box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:28px}
+
+  /* ── EMPTY state ─────────────────────────────────────────── */
+  .empty-hero{text-align:center;padding:50px 20px}
+  .empty-hero .icon{font-size:42px;margin-bottom:14px}
+  .empty-hero h2{font-size:22px;color:var(--navy);margin-bottom:8px}
+  .empty-hero p{color:var(--muted);margin-bottom:28px;font-size:13px}
+  .cert-input-row{display:flex;gap:10px;max-width:520px;margin:0 auto}
+  .cert-input{flex:1;padding:14px 18px;font-size:17px;letter-spacing:1px;
+              border:2px solid var(--border);border-radius:8px;font-family:monospace;
+              outline:none;transition:border .15s}
+  .cert-input:focus{border-color:var(--accent)}
+  .btn-primary{background:var(--accent);color:#fff;border:none;border-radius:8px;
+               padding:0 26px;font-size:14px;font-weight:600;cursor:pointer;
+               display:flex;align-items:center;gap:7px}
+  .btn-primary:hover{opacity:.88}
+  .kbd-hint{margin-top:14px;color:var(--muted);font-size:11px}
+  .kbd{background:#eef0f5;border:1px solid var(--border);border-radius:3px;
+       padding:1px 6px;font-family:monospace;font-size:10px}
+
+  /* ── SEARCHING state ────────────────────────────────────── */
+  .search-header{display:flex;align-items:center;gap:16px;margin-bottom:28px;
+                 padding-bottom:20px;border-bottom:1px solid var(--border)}
+  .search-header .cert-display{font-family:monospace;font-size:18px;font-weight:700;color:var(--navy)}
+  .search-header .badge{background:var(--accent);color:#fff;padding:3px 10px;
+                        border-radius:4px;font-size:11px;font-weight:700;letter-spacing:.5px}
+  .source-chips{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .chip{border:1px solid var(--border);border-radius:8px;padding:18px 16px;
+        display:flex;align-items:center;gap:12px;transition:all .3s}
+  .chip.pending{background:#f8f9fb}
+  .chip.loading{background:#f1f6fd;border-color:var(--accent)}
+  .chip.done{background:#f0f9f1;border-color:var(--green)}
+  .chip.error{background:#fdf2f2;border-color:var(--red)}
+  .chip-icon{width:34px;height:34px;border-radius:50%;background:#e8ecf3;
+             display:flex;align-items:center;justify-content:center;font-weight:700;
+             font-size:13px;color:var(--muted)}
+  .chip.done .chip-icon{background:var(--green);color:#fff}
+  .chip.error .chip-icon{background:var(--red);color:#fff}
+  .chip.loading .chip-icon{background:var(--accent);color:#fff}
+  .chip-body .src{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .chip-body .status{font-size:13px;font-weight:600;color:var(--text);margin-top:3px}
+  .spinner-mini{width:14px;height:14px;border:2px solid rgba(74,144,226,.25);
+                border-top-color:var(--accent);border-radius:50%;
+                animation:spin .7s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── PREVIEW state ──────────────────────────────────────── */
+  .preview-grid{display:grid;grid-template-columns:300px 1fr;gap:28px}
+  @media (max-width:780px){.preview-grid{grid-template-columns:1fr}}
+  .img-column{display:flex;flex-direction:column;gap:12px}
+  .img-wrap{background:#eef1f7;border:1px solid var(--border);border-radius:8px;
+            aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;
+            color:var(--muted);font-size:11px;font-weight:600;
+            background-image:linear-gradient(45deg,#f5f7fb 25%,transparent 25%),
+                             linear-gradient(-45deg,#f5f7fb 25%,transparent 25%),
+                             linear-gradient(45deg,transparent 75%,#f5f7fb 75%),
+                             linear-gradient(-45deg,transparent 75%,#f5f7fb 75%);
+            background-size:14px 14px;
+            background-position:0 0,0 7px,7px -7px,-7px 0}
+  .img-label{font-size:10px;color:var(--muted);text-align:center;text-transform:uppercase;
+             letter-spacing:.5px;font-weight:700}
+  .match-badge{background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;
+               padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;
+               text-align:center}
+
+  .detail-column h2{font-size:20px;color:var(--navy);margin-bottom:4px}
+  .detail-column .sub{color:var(--muted);font-size:12px;margin-bottom:4px}
+  .pills{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+  .pill{background:#eef3fa;color:var(--accent);padding:3px 10px;border-radius:12px;
+        font-size:11px;font-weight:700}
+  .pill.grade{background:var(--navy);color:#fff}
+  .pill.variety{background:#fff3e0;color:#e65100}
+
+  .section{margin-top:22px}
+  .section-title{font-size:11px;font-weight:700;color:var(--muted);
+                 text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+  .price-row{display:flex;justify-content:space-between;padding:10px 0;
+             border-bottom:1px solid #f0f2f7;font-size:13px}
+  .price-row:last-child{border-bottom:none}
+  .price-row .src{color:var(--muted)}
+  .price-row .val{font-weight:700;font-family:monospace}
+  .price-row .src-tag{font-size:10px;color:var(--green);margin-left:6px;font-weight:600}
+  .price-row .src-tag.warn{color:var(--orange)}
+
+  .edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+  .edit-field label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;
+                    letter-spacing:.5px;font-weight:700;margin-bottom:4px}
+  .edit-field input,.edit-field textarea{width:100%;padding:8px 10px;border:1px solid var(--border);
+                                          border-radius:6px;font-size:13px;font-family:inherit;
+                                          background:#fafbfd;outline:none}
+  .edit-field input:focus{border-color:var(--accent);background:#fff}
+  .edit-field.wide{grid-column:span 2}
+
+  .signal-box{background:linear-gradient(135deg,#e8f5e9,#f0f9f1);
+              border:1px solid #a5d6a7;border-radius:8px;padding:14px 16px;
+              display:flex;align-items:center;gap:14px}
+  .signal-chip{background:var(--green);color:#fff;font-weight:700;
+               padding:6px 12px;border-radius:4px;font-size:12px;letter-spacing:.5px}
+  .signal-text{font-size:12px;color:var(--text)}
+  .signal-text strong{color:var(--green)}
+
+  .action-row{display:flex;gap:10px;justify-content:flex-end;
+              margin-top:28px;padding-top:20px;border-top:1px solid var(--border)}
+  .btn-secondary{background:#fff;border:1px solid var(--border);color:var(--text);
+                 padding:10px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn-secondary:hover{background:#f8f9fb}
+  .btn-danger{background:#fff;border:1px solid #e5a8a5;color:var(--red);
+              padding:10px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn-success{background:var(--green);color:#fff;border:none;
+               padding:10px 22px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer}
+
+  /* ── SAVED state ────────────────────────────────────────── */
+  .saved-banner{background:linear-gradient(135deg,#e8f5e9,#f0f9f1);
+                border:1px solid var(--green);border-radius:var(--radius);
+                padding:32px;text-align:center}
+  .saved-banner .check{width:56px;height:56px;border-radius:50%;background:var(--green);
+                       color:#fff;display:flex;align-items:center;justify-content:center;
+                       font-size:28px;margin:0 auto 14px}
+  .saved-banner h3{color:var(--navy);font-size:18px;margin-bottom:6px}
+  .saved-banner p{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .saved-links{display:flex;gap:10px;justify-content:center}
+  .saved-link{color:var(--accent);text-decoration:none;font-weight:600;font-size:13px;
+              padding:8px 16px;border:1px solid var(--accent);border-radius:6px}
+  .saved-link:hover{background:var(--accent);color:#fff}
+
+  /* ── Error state (partial, shown in SEARCHING chips) ──── */
+
+  hr.sep{border:none;border-top:2px dashed #d3d9e6;margin:40px 0}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     STATE 1 — EMPTY
+     ═══════════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="brand"><span class="brand-icon">🎴</span> PSA × Collectr Tracer</div>
+  <div class="nav-tabs">
+    <div class="nav-tab">Dashboard</div>
+    <div class="nav-tab">Portfolio</div>
+    <div class="nav-tab add active">➕ Add Card</div>
+    <div class="nav-tab">Signals</div>
+    <div class="nav-tab">Market</div>
+  </div>
+  <div style="color:rgba(255,255,255,.6);font-size:11px">Last sync: 2026-04-17 14:02</div>
+</div>
+<div class="main">
+  <div class="state-heading">State 1 · Empty — awaiting cert</div>
+  <div class="panel">
+    <div class="empty-hero">
+      <div class="icon">🔎</div>
+      <h2>Add a new card to your portfolio</h2>
+      <p>Paste a PSA Cert Number. We'll fetch identity, images, live Collectr price,<br>
+         and recent eBay comps in parallel — then you validate before save.</p>
+      <div class="cert-input-row">
+        <input class="cert-input" placeholder="131858430" maxlength="10">
+        <button class="btn-primary">🔎 Search</button>
+      </div>
+      <div class="kbd-hint">Shortcut: press <span class="kbd">n</span> on any tab to jump here · <span class="kbd">Enter</span> to search</div>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════════════════════════
+     STATE 2 — SEARCHING (parallel fetch in progress)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="brand"><span class="brand-icon">🎴</span> PSA × Collectr Tracer</div>
+  <div class="nav-tabs">
+    <div class="nav-tab">Dashboard</div>
+    <div class="nav-tab">Portfolio</div>
+    <div class="nav-tab add active">➕ Add Card</div>
+    <div class="nav-tab">Signals</div>
+    <div class="nav-tab">Market</div>
+  </div>
+  <div style="color:rgba(255,255,255,.6);font-size:11px">Last sync: 2026-04-17 14:02</div>
+</div>
+<div class="main">
+  <div class="state-heading">State 2 · Searching — parallel fetch PSA + Collectr + eBay</div>
+  <div class="panel">
+    <div class="search-header">
+      <span class="badge">CERT</span>
+      <span class="cert-display">131858430</span>
+      <span style="color:var(--muted);font-size:12px;margin-left:auto">
+        <span class="spinner-mini"></span> Fetching from 3 sources…
+      </span>
+    </div>
+    <div class="source-chips">
+      <div class="chip done">
+        <div class="chip-icon">✓</div>
+        <div class="chip-body">
+          <div class="src">PSA Cert</div>
+          <div class="status">Found · PSA 8 · 2023 Slowpoke</div>
+        </div>
+      </div>
+      <div class="chip loading">
+        <div class="chip-icon"><span class="spinner-mini" style="border-top-color:#fff"></span></div>
+        <div class="chip-body">
+          <div class="src">Collectr Live</div>
+          <div class="status">Matching product…</div>
+        </div>
+      </div>
+      <div class="chip pending">
+        <div class="chip-icon">…</div>
+        <div class="chip-body">
+          <div class="src">eBay Sold</div>
+          <div class="status" style="color:var(--muted)">Queued (3 mo comps)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════════════════════════
+     STATE 3 — PREVIEW (all sources resolved, full validation)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="brand"><span class="brand-icon">🎴</span> PSA × Collectr Tracer</div>
+  <div class="nav-tabs">
+    <div class="nav-tab">Dashboard</div>
+    <div class="nav-tab">Portfolio</div>
+    <div class="nav-tab add active">➕ Add Card</div>
+    <div class="nav-tab">Signals</div>
+    <div class="nav-tab">Market</div>
+  </div>
+  <div style="color:rgba(255,255,255,.6);font-size:11px">Last sync: 2026-04-17 14:02</div>
+</div>
+<div class="main">
+  <div class="state-heading">State 3 · Preview — validate then approve or edit</div>
+  <div class="panel">
+    <div class="preview-grid">
+      <!-- LEFT: images -->
+      <div class="img-column">
+        <div class="img-wrap">PSA CERT IMAGE<br>(from PSA scan)</div>
+        <div class="img-label">PSA Official</div>
+        <div class="img-wrap">COLLECTR IMAGE<br>(from product page)</div>
+        <div class="img-label">Collectr Product</div>
+        <div class="match-badge">✓ Image match · visual hash OK</div>
+      </div>
+      <!-- RIGHT: details -->
+      <div class="detail-column">
+        <h2>Slowpoke · Art Rare</h2>
+        <div class="sub">2023 Pokemon Japanese SV1V-Violet ex · Card #082</div>
+        <div class="pills">
+          <span class="pill grade">PSA 8</span>
+          <span class="pill variety">ART RARE</span>
+          <span class="pill">Cert 131858430</span>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Market (3 sources merged)</div>
+          <div class="price-row">
+            <span class="src">Collectr live</span>
+            <span><span class="val">฿843</span><span class="src-tag">✓ matched</span></span>
+          </div>
+          <div class="price-row">
+            <span class="src">PSA estimate</span>
+            <span><span class="val">฿25.44</span><span class="src-tag warn">est.</span></span>
+          </div>
+          <div class="price-row">
+            <span class="src">eBay sold (3 mo avg)</span>
+            <span><span class="val">฿780</span><span class="src-tag">n=7</span></span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">My Info (editable)</div>
+          <div class="edit-grid">
+            <div class="edit-field">
+              <label>My Cost (฿)</label>
+              <input type="number" placeholder="e.g. 720">
+            </div>
+            <div class="edit-field">
+              <label>Date Acquired</label>
+              <input type="date" value="2026-04-17">
+            </div>
+            <div class="edit-field">
+              <label>Source</label>
+              <input type="text" placeholder="e.g. Mercari, Yahoo Auctions">
+            </div>
+            <div class="edit-field">
+              <label>Item Status</label>
+              <input type="text" value="Active">
+            </div>
+            <div class="edit-field wide">
+              <label>Notes</label>
+              <input type="text" placeholder="Any personal notes…">
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Signal Preview</div>
+          <div class="signal-box">
+            <span class="signal-chip">BUY</span>
+            <span class="signal-text">
+              <strong>LOW risk · +17.1% upside</strong><br>
+              Collectr ฿843 vs cost ฿720 · confidence 88% · liquidity MEDIUM
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="action-row">
+      <button class="btn-danger">✕ Cancel</button>
+      <button class="btn-secondary">✎ Edit more</button>
+      <button class="btn-success">✓ Approve & Save to Master</button>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ═══════════════════════════════════════════════════════════
+     STATE 4 — SAVED (confirmation, auto-reset in 5 s)
+     ═══════════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="brand"><span class="brand-icon">🎴</span> PSA × Collectr Tracer</div>
+  <div class="nav-tabs">
+    <div class="nav-tab">Dashboard</div>
+    <div class="nav-tab">Portfolio</div>
+    <div class="nav-tab add active">➕ Add Card</div>
+    <div class="nav-tab">Signals</div>
+    <div class="nav-tab">Market</div>
+  </div>
+  <div style="color:rgba(255,255,255,.6);font-size:11px">Last sync: 2026-04-17 14:02</div>
+</div>
+<div class="main">
+  <div class="state-heading">State 4 · Saved — appended to Portfolio_Master.xlsx</div>
+  <div class="saved-banner">
+    <div class="check">✓</div>
+    <h3>Cert 131858430 saved to master workbook</h3>
+    <p>Row appended to <strong>Portfolio_Master.xlsx</strong> › Cards sheet · Sync Log updated · Dashboard refreshing…</p>
+    <div class="saved-links">
+      <a class="saved-link" href="#">View in Portfolio →</a>
+      <a class="saved-link" href="#">➕ Add another</a>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

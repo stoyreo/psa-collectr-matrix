@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{project_name}} — Dashboard Ready</title>
+</head>
+<body style="margin:0;padding:0;background:#F0F2F7;font-family:'Segoe UI',Arial,sans-serif;">
+
+  <!-- Wrapper -->
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F0F2F7;padding:32px 16px;">
+    <tr><td align="center">
+
+      <!-- Card -->
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="background:#ffffff;border-radius:12px;overflow:hidden;
+                    box-shadow:0 4px 24px rgba(27,42,74,.12);max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1B2A4A 0%,#2D4A8A 100%);
+                     padding:32px 40px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;">{{project_emoji}}</div>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;
+                       letter-spacing:.5px;">{{project_name}}</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,.65);font-size:13px;">
+              Your live dashboard is ready
+            </p>
+          </td>
+        </tr>
+
+        <!-- Status pill -->
+        <tr>
+          <td style="padding:0 40px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="padding:20px 0 0;">
+                  <span style="display:inline-block;background:#E8F5E9;color:#2E7D32;
+                               border-radius:20px;padding:6px 18px;font-size:13px;font-weight:600;">
+                    ✅ &nbsp;Tunnel Active — {{timestamp}}
+                  </span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:28px 40px 8px;">
+            <p style="margin:0 0 16px;color:#1A2030;font-size:15px;line-height:1.6;">
+              Hi there,
+            </p>
+            <p style="margin:0 0 20px;color:#3A4560;font-size:14px;line-height:1.7;">
+              The <strong>{{project_name}}</strong> dashboard is now live and accessible
+              from any device worldwide. Click the button below to open it.
+            </p>
+          </td>
+        </tr>
+
+        <!-- CTA Button -->
+        <tr>
+          <td style="padding:8px 40px 28px;text-align:center;">
+            <a href="{{public_url}}" target="_blank"
+               style="display:inline-block;background:linear-gradient(135deg,#4A90E2,#2D6FBF);
+                      color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;
+                      padding:14px 36px;border-radius:8px;letter-spacing:.3px;
+                      box-shadow:0 4px 14px rgba(74,144,226,.4);">
+              {{project_emoji}} &nbsp;Open Dashboard
+            </a>
+            <p style="margin:12px 0 0;font-size:11px;color:#9BA4C0;">
+              or copy this link:&nbsp;
+              <a href="{{public_url}}" style="color:#4A90E2;word-break:break-all;">{{public_url}}</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Divider -->
+        <tr>
+          <td style="padding:0 40px;">
+            <hr style="border:none;border-top:1px solid #E8EAF2;margin:0;">
+          </td>
+        </tr>
+
+        <!-- Info row -->
+        <tr>
+          <td style="padding:20px 40px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="50%" style="padding:0 8px 0 0;vertical-align:top;">
+                  <div style="background:#F7F9FC;border-radius:8px;padding:14px 16px;">
+                    <div style="font-size:11px;color:#9BA4C0;font-weight:600;
+                                text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">
+                      Access
+                    </div>
+                    <div style="font-size:13px;color:#1A2030;font-weight:600;">
+                      Worldwide 🌏
+                    </div>
+                    <div style="font-size:12px;color:#6B7694;margin-top:2px;">
+                      Any phone, tablet, browser
+                    </div>
+                  </div>
+                </td>
+                <td width="50%" style="padding:0 0 0 8px;vertical-align:top;">
+                  <div style="background:#F7F9FC;border-radius:8px;padding:14px 16px;">
+                    <div style="font-size:11px;color:#9BA4C0;font-weight:600;
+                                text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">
+                      Note
+                    </div>
+                    <div style="font-size:13px;color:#1A2030;font-weight:600;">
+                      Temporary URL ⏳
+                    </div>
+                    <div style="font-size:12px;color:#6B7694;margin-top:2px;">
+                      Changes on each restart
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#F7F9FC;padding:16px 40px;text-align:center;
+                     border-top:1px solid #E8EAF2;">
+            <p style="margin:0;font-size:11px;color:#9BA4C0;">
+              {{project_name}} &nbsp;·&nbsp; Sent by {{sender}} &nbsp;·&nbsp;
+              This is an automated notification — do not reply.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+
+</body>
+</html>

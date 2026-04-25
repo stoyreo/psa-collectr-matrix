@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokémon Card Investment Matrix</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #222;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        header {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #999;
+            margin-top: 10px;
+        }
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .summary-card .label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .summary-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            background: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            border-left: 4px solid #667eea;
+            font-size: 20px;
+            font-weight: bold;
+            color: #222;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            border-bottom: 2px solid #ddd;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        tr:hover {
+            background: #fafafa;
+        }
+        .action-buy {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .action-hold {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .action-sell {
+            background: #ffebee;
+            color: #c62828;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .tier-s { color: #d32f2f; font-weight: 600; }
+        .tier-a { color: #f57c00; font-weight: 600; }
+        .tier-b { color: #1976d2; }
+        .liquidity-high { color: #2e7d32; font-weight: 600; }
+        .liquidity-medium { color: #f57c00; font-weight: 600; }
+        .liquidity-low { color: #d32f2f; font-weight: 600; }
+        .risk-high { background: #ffebee; color: #d32f2f; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+        .risk-medium { background: #fff3e0; color: #e65100; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+        .risk-low { background: #e8f5e9; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+        .score {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 14px;
+        }
+        .confidence-bar {
+            width: 100%;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: #667eea;
+            border-radius: 3px;
+        }
+        .drivers-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .drivers-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .drivers-list {
+            list-style: none;
+        }
+        .drivers-list li {
+            padding: 8px 0;
+            color: #333;
+            font-size: 13px;
+            border-bottom: 1px solid #eee;
+        }
+        .drivers-list li:before {
+            content: "• ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .drivers-list li:last-child {
+            border-bottom: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 16px;
+        }
+        .error {
+            background: #ffebee;
+            color: #d32f2f;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .filter-row {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-row label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        }
+        .filter-row select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pokémon Card Investment Matrix</h1>
+            <p class="subtitle">Quantitative analysis: BUY decision matrix + ACTION engine</p>
+            <div class="timestamp" id="timestamp"></div>
+        </header>
+
+        <div class="summary-cards" id="summaryCards">
+            <div class="loading">Loading data...</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Layer 2: Action Engine (BUY/HOLD/SELL + Confidence)</div>
+            <div class="filter-row">
+                <label>Filter by Action:</label>
+                <select id="actionFilter" onchange="filterTable()">
+                    <option value="">All Actions</option>
+                    <option value="BUY">BUY</option>
+                    <option value="HOLD">HOLD</option>
+                    <option value="SELL">SELL</option>
+                </select>
+            </div>
+            <table id="actionTable">
+                <thead>
+                    <tr>
+                        <th>Card</th>
+                        <th>Action</th>
+                        <th>Confidence %</th>
+                        <th>Score</th>
+                        <th>Underval %</th>
+                        <th>Demand</th>
+                        <th>Liquidity</th>
+                        <th>Pop Risk</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody id="actionTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Layer 1: BUY Decision Matrix (10 Criteria)</div>
+            <table id="matrixTable">
+                <thead>
+                    <tr>
+                        <th>Card</th>
+                        <th>Underval %</th>
+                        <th>Demand</th>
+                        <th>Liquidity</th>
+                        <th>Icon Tier</th>
+                        <th>Pop Risk</th>
+                        <th>Momentum</th>
+                        <th>Entry Barrier</th>
+                        <th>Visual</th>
+                        <th>Catalyst</th>
+                        <th>Exit Ease</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody id="matrixTableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="drivers-section">
+            <h3>Key BUY Drivers</h3>
+            <ul class="drivers-list" id="buyDrivers"></ul>
+        </div>
+
+        <div class="drivers-section">
+            <h3>Risk Flags</h3>
+            <ul class="drivers-list" id="riskFlags"></ul>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        function getTierClass(tier) {
+            if (tier === 'S') return 'tier-s';
+            if (tier === 'A') return 'tier-a';
+            return 'tier-b';
+        }
+
+        function getLiquidityClass(liq) {
+            if (liq === 'High') return 'liquidity-high';
+            if (liq === 'Medium') return 'liquidity-medium';
+            return 'liquidity-low';
+        }
+
+        function getRiskClass(risk) {
+            if (risk === 'High') return 'risk-high';
+            if (risk === 'Medium') return 'risk-medium';
+            return 'risk-low';
+        }
+
+        function getActionClass(action) {
+            if (action === 'BUY') return 'action-buy';
+            if (action === 'HOLD') return 'action-hold';
+            return 'action-sell';
+        }
+
+        function renderMatrix(data) {
+            // Render summary cards
+            const summary = data.summary;
+            const summaryHtml = `
+                <div class="summary-card">
+                    <div class="label">Total Cards</div>
+                    <div class="value">${summary.total_cards}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">BUY Signal</div>
+                    <div class="value" style="color: #2e7d32;">${summary.buy_count}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">HOLD Signal</div>
+                    <div class="value" style="color: #1976d2;">${summary.hold_count}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="label">SELL Signal</div>
+                    <div class="value" style="color: #d32f2f;">${summary.sell_count}</div>
+                </div>
+            `;
+            document.getElementById('summaryCards').innerHTML = summaryHtml;
+
+            // Render timestamp
+            const dt = new Date(data.timestamp);
+            document.getElementById('timestamp').textContent = 'Generated: ' + dt.toLocaleString();
+
+            // Render action engine table
+            let actionHtml = '';
+            data.matrix.forEach(card => {
+                const conf = Math.round(card.confidence);
+                actionHtml += `
+                    <tr>
+                        <td>${card.card}</td>
+                        <td><span class="${getActionClass(card.action)}">${card.action}</span></td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span>${conf}%</span>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" style="width: ${conf}%;"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="score">${card.buy_score}/10</span></td>
+                        <td>${card.undervaluation_pct.toFixed(1)}%</td>
+                        <td><span class="${getTierClass(card.demand)}">${card.demand}</span></td>
+                        <td><span class="${getLiquidityClass(card.liquidity)}">${card.liquidity}</span></td>
+                        <td><span class="${getRiskClass(card.pop_risk)}">${card.pop_risk}</span></td>
+                        <td style="font-size: 12px; color: #666;">${card.reason}</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('actionTableBody').innerHTML = actionHtml;
+
+            // Render matrix table
+            let matrixHtml = '';
+            data.matrix.forEach(card => {
+                matrixHtml += `
+                    <tr>
+                        <td>${card.card}</td>
+                        <td>${card.undervaluation_pct.toFixed(1)}%</td>
+                        <td><span class="${getTierClass(card.demand)}">${card.demand}</span></td>
+                        <td><span class="${getLiquidityClass(card.liquidity)}">${card.liquidity}</span></td>
+                        <td><span class="${getTierClass(card.icon_tier)}">${card.icon_tier}</span></td>
+                        <td><span class="${getRiskClass(card.pop_risk)}">${card.pop_risk}</span></td>
+                        <td>${card.momentum}</td>
+                        <td>${card.entry_barrier}</td>
+                        <td>${card.visual}</td>
+                        <td>${card.catalyst}</td>
+                        <td>${card.exit_ease}</td>
+                        <td><span class="score">${card.buy_score}/10</span></td>
+                    </tr>
+                `;
+            });
+            document.getElementById('matrixTableBody').innerHTML = matrixHtml;
+
+            // Render key drivers
+            let driversHtml = '';
+            data.key_buy_drivers.forEach(driver => {
+                driversHtml += `<li>${driver}</li>`;
+            });
+            document.getElementById('buyDrivers').innerHTML = driversHtml;
+
+            // Render risk flags
+            let risksHtml = '';
+            data.risk_flags.forEach(risk => {
+                risksHtml += `<li>${risk}</li>`;
+            });
+            document.getElementById('riskFlags').innerHTML = risksHtml;
+        }
+
+        function filterTable() {
+            const filter = document.getElementById('actionFilter').value;
+            const rows = document.getElementById('actionTableBody').getElementsByTagName('tr');
+            for (let row of rows) {
+                const action = row.cells[1].textContent.trim();
+                if (filter === '' || action.includes(filter)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        }
+
+        // Load data on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetch('/api/quantitative-matrix')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'error') {
+                        document.getElementById('error').textContent = 'Error: ' + data.message;
+                        document.getElementById('error').style.display = 'block';
+                    } else {
+                        renderMatrix(data);
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('error').textContent = 'Network error: ' + err;
+                    document.getElementById('error').style.display = 'block';
+                });
+        });
+    </script>
+</body>
+</html>

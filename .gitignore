@@ -1,0 +1,41 @@
+# Next.js
+node_modules/
+.next/
+.vercel/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment / secrets — NEVER commit
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Build artifacts
+*.spec.bak
+
+# Logs
+*.log
+output/*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS / FUSE temp
+.DS_Store
+Thumbs.db
+.fuse_hidden*
+
+# Local-only data
+manual_image_overrides/
+cache/

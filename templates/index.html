@@ -1,0 +1,2928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSA × Collectr Tracer</title>
+<style>
+  /* ── Reset & Base ─────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy:   #1B2A4A;
+    --navy2:  #243459;
+    --accent: #4A90E2;
+    --green:  #4CAF50;
+    --red:    #F44336;
+    --blue:   #2196F3;
+    --orange: #FF9800;
+    --bg:     #F0F2F7;
+    --card:   #FFFFFF;
+    --border: #E0E4EE;
+    --text:   #1A2030;
+    --muted:  #6B7694;
+    --radius: 10px;
+    --shadow: 0 2px 12px rgba(27,42,74,.10);
+  }
+  html, body { height: 100%; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+               background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* ── Top Nav ─────────────────────────────────────────────── */
+  .topbar {
+    background: var(--navy);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700;
+           font-size: 16px; letter-spacing: .3px; }
+  .brand-icon { font-size: 22px; }
+  .nav-tabs { display: flex; gap: 2px; }
+  .nav-tab {
+    padding: 0 18px; height: 56px; display: flex; align-items: center;
+    color: rgba(255,255,255,.65); cursor: pointer; font-size: 13px; font-weight: 500;
+    border-bottom: 3px solid transparent; transition: all .15s; white-space: nowrap;
+    user-select: none;
+  }
+  .nav-tab:hover { color: #fff; background: rgba(255,255,255,.07); }
+  .nav-tab.active { color: #fff; border-bottom-color: var(--accent); }
+  .refresh-area { display: flex; align-items: center; gap: 12px; }
+  .ts-label { color: rgba(255,255,255,.5); font-size: 11px; text-align: right; line-height: 1.4; }
+  .ts-label .ts-val { color: rgba(255,255,255,.85); font-weight: 600; }
+  .btn-refresh {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 7px; transition: opacity .15s;
+    white-space: nowrap;
+  }
+  .btn-refresh:hover { opacity: .88; }
+  .btn-refresh:disabled { opacity: .5; cursor: not-allowed; }
+  /* spinner inside button */
+  .btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
+                 border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite;
+                 display: none; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn-refresh.loading .btn-spinner { display: block; }
+  .btn-refresh.loading .btn-icon    { display: none; }
+  /* external status pill next to button */
+  .refresh-status {
+    display: none; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18);
+    border-radius: 20px; padding: 5px 12px 5px 8px;
+    color: rgba(255,255,255,.9); font-size: 12px; font-weight: 500;
+    white-space: nowrap; animation: fadeIn .2s ease;
+  }
+  .refresh-status.visible { display: flex; }
+  .ext-spinner {
+    width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.25);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin .65s linear infinite; flex-shrink: 0;
+  }
+  .refresh-status .step-text { transition: opacity .15s; }
+  @keyframes fadeIn { from { opacity:0; transform:translateX(6px); } to { opacity:1; transform:none; } }
+
+  /* ── Layout ───────────────────────────────────────────────── */
+  .main { max-width: 1300px; margin: 0 auto; padding: 24px 20px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Empty/Error states ───────────────────────────────────── */
+  .state-banner {
+    background: var(--card); border: 1px dashed var(--border); border-radius: var(--radius);
+    padding: 48px; text-align: center; color: var(--muted);
+  }
+  .state-banner h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+  .state-banner p { font-size: 13px; }
+  .state-banner.error { border-color: var(--red); background: #FFF5F5; }
+  .state-banner.error h3 { color: var(--red); }
+
+  /* Loading skeleton */
+  .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+              background-size: 200% 100%; animation: loading 1.5s infinite; }
+  @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skeleton-row { height: 40px; margin-bottom: 8px; border-radius: 4px; }
+
+  /* Error state with retry button */
+  .error-action { margin-top: 16px; }
+  .btn-retry { background: var(--accent); color: #fff; border: none; border-radius: 6px;
+               padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-retry:hover { opacity: 0.9; }
+
+  /* ── Summary Cards ────────────────────────────────────────── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;
+              margin-bottom: 24px; }
+  .kpi-card {
+    background: var(--card); border-radius: var(--radius); padding: 18px 20px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+  }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+               letter-spacing: .7px; margin-bottom: 6px; }
+  .kpi-val { font-size: 22px; font-weight: 700; line-height: 1; }
+  .kpi-val.pos { color: var(--green); }
+  .kpi-val.neg { color: var(--red); }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Section rows ─────────────────────────────────────────── */
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 780px) { .row2 { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border-radius: var(--radius); padding: 20px 22px;
+           box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .panel-title { font-size: 13px; font-weight: 700; color: var(--navy);
+                 text-transform: uppercase; letter-spacing: .6px; margin-bottom: 16px;
+                 padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+  /* ── Signal / Risk bars ───────────────────────────────────── */
+  .dist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+  .dist-label { width: 70px; font-weight: 600; }
+  .dist-bar-wrap { flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .dist-bar { height: 100%; border-radius: 4px; transition: width .4s; }
+  .dist-count { width: 28px; text-align: right; color: var(--muted); font-size: 12px; }
+
+  /* ── Tables ───────────────────────────────────────────────── */
+  .tbl-wrap { overflow-x: auto; border-radius: var(--radius); max-height: 600px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { position: sticky; top: 0; z-index: 10; }
+  thead th { background: var(--navy); color: #fff; padding: 10px 12px; text-align: left;
+             font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+             white-space: nowrap; cursor: pointer; user-select: none; }
+  thead th:first-child { border-radius: var(--radius) 0 0 0; }
+  thead th:last-child  { border-radius: 0 var(--radius) 0 0; }
+  thead th:hover { background: var(--navy2); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:last-child  { border-bottom: none; }
+  tbody tr:hover { background: #F0F4FB; }
+  tbody td { padding: 10px 12px; vertical-align: middle; }
+  .tbl-wrap.panel { padding: 0; }
+  .tbl-wrap.panel thead th:first-child { border-radius: 0; }
+  .tbl-wrap.panel thead th:last-child  { border-radius: 0; }
+  /* Color-blind accessibility: add text labels for signal colors */
+  .signal-label { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+
+  /* ── Badges ───────────────────────────────────────────────── */
+  .badge {
+    display: inline-block; padding: 3px 9px; border-radius: 4px; font-size: 11px;
+    font-weight: 700; letter-spacing: .4px; color: #fff; white-space: nowrap;
+  }
+  .num-pos { color: var(--green); font-weight: 600; }
+  .num-neg { color: var(--red);   font-weight: 600; }
+  .num-neu { color: var(--muted); }
+
+  /* ── Collectr URL link ────────────────────────────────────── */
+  a.clink { color: var(--accent); text-decoration: none; font-size: 12px; }
+  a.clink:hover { text-decoration: underline; }
+
+  /* ── Toast ────────────────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; background: #1A2030;
+    color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.3); opacity: 0; transform: translateY(12px);
+    transition: all .25s; pointer-events: none; z-index: 9999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.err  { background: #C0392B; }
+
+  /* ── Insights layout ──────────────────────────────────────── */
+  .ins-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .ins-grid { grid-template-columns: 1fr; } }
+
+  /* ── Exception list ───────────────────────────────────────── */
+  .exc-item { background: #FFF8F0; border: 1px solid #FFD9A0; border-radius: 6px;
+              padding: 10px 14px; margin-bottom: 8px; font-size: 12px; }
+  .exc-item b { color: var(--orange); }
+
+  /* ── Legend panel ─────────────────────────────────────────── */
+  .legend-panel { background: var(--card); border: 1px solid var(--border);
+                  border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; }
+  .legend-hdr {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; cursor: pointer; user-select: none;
+    font-size: 11px; font-weight: 700; color: var(--navy);
+    text-transform: uppercase; letter-spacing: .6px;
+    background: #F7F9FF; border-radius: var(--radius);
+    border-bottom: 1px solid transparent; transition: background .15s;
+  }
+  .legend-hdr:hover { background: #EEF2FF; }
+  .legend-hdr.open { border-radius: var(--radius) var(--radius) 0 0;
+                     border-bottom-color: var(--border); }
+  .legend-chevron { font-size: 10px; color: var(--muted); transition: transform .2s; }
+  .legend-chevron.open { transform: rotate(180deg); }
+  .legend-body { display: none; padding: 14px 16px;
+                 grid-template-columns: 1fr 1px 1fr 1px 1fr; gap: 0; }
+  .legend-body.open { display: grid; }
+  .legend-col { padding: 0 14px; }
+  .legend-col:first-child { padding-left: 0; }
+  .legend-col:last-child  { padding-right: 0; }
+  .legend-div { background: var(--border); }
+  .legend-col-title { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                      letter-spacing: .8px; color: var(--muted); margin-bottom: 10px; }
+  .legend-row { display: flex; align-items: flex-start; gap: 8px;
+                margin-bottom: 7px; font-size: 12px; color: #444; line-height: 1.4; }
+  .legend-lbl { flex-shrink: 0; min-width: 62px; display: flex; align-items: center; }
+
+  /* ── Sortable column headers ──────────────────────────────── */
+  thead th.sortable { cursor: pointer; user-select: none; }
+  thead th.sortable:hover { background: var(--navy2); }
+  .sort-arr { display: inline-block; margin-left: 4px; font-size: 9px;
+              opacity: .3; vertical-align: middle; transition: opacity .15s; }
+  thead th.sort-asc  .sort-arr,
+  thead th.sort-desc .sort-arr { opacity: 1; color: #7DD3FC; }
+
+  /* ── Enhanced Dashboard ───────────────────────────── */
+  .dash-full  { margin-bottom: 16px; }
+  .dash-mid   { display: grid; grid-template-columns: 1fr 230px; gap: 16px; margin-bottom: 16px; }
+  .dash-mid-right { display: flex; flex-direction: column; gap: 16px; }
+  .dash-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 1100px) { .dash-split { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .dash-mid { grid-template-columns: 1fr; } }
+
+  /* Market Outperformers panel */
+  .outp-hdr-row { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .outp-sources { display:flex; gap:4px; flex-wrap:wrap; }
+  .outp-src-chip { font-size:9px; font-weight:700; padding:2px 6px; border-radius:10px; background:#F5F7FA; color:#546E7A; border:1px solid #E0E6ED; letter-spacing:.3px; text-transform:uppercase; }
+  .outp-src-chip.live { background:#E8F5E9; color:#1B5E20; border-color:#A5D6A7; }
+  .outp-list { display:flex; flex-direction:column; gap:6px; margin-top:8px; max-height:300px; overflow-y:auto; padding-right:4px; }
+  .outp-row { display:grid; grid-template-columns: 22px 36px 1fr auto; gap:8px; align-items:center; padding:7px 9px; border-radius:6px; background:linear-gradient(90deg, rgba(76,175,80,.06) 0%, rgba(76,175,80,0) 100%); border:1px solid #E8F5E9; transition:all .15s; }
+  .outp-thumb { display:flex; align-items:center; justify-content:center; }
+  .outp-row:hover { background:linear-gradient(90deg, rgba(76,175,80,.12) 0%, rgba(76,175,80,.02) 100%); border-color:#A5D6A7; }
+  .outp-rank { font-size:11px; font-weight:800; color:#2E7D32; text-align:center; background:#E8F5E9; border-radius:4px; padding:2px 0; }
+  .outp-rank.top3 { background:#FFD54F; color:#5D4037; }
+  .outp-info { display:flex; flex-direction:column; min-width:0; }
+  .outp-name { font-size:12px; font-weight:700; color:#1A237E; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .outp-sub  { font-size:10px; color:#78909C; display:flex; gap:6px; flex-wrap:wrap; margin-top:1px; }
+  .outp-src-dot { display:inline-flex; align-items:center; gap:2px; font-weight:600; }
+  .outp-src-dot .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .outp-perf { text-align:right; min-width:72px; }
+  .outp-pct  { font-size:13px; font-weight:800; color:#2E7D32; line-height:1; }
+  .outp-abs  { font-size:10px; color:#546E7A; margin-top:2px; }
+  .outp-empty { text-align:center; color:var(--muted); font-size:12px; padding:24px 8px; }
+  .chart-wrap { position: relative; }
+  .chart-note { font-size: 11px; color: var(--muted); margin-bottom: 10px; display: block; }
+  .kpi-card.kpi-buy    { border-top: 3px solid #4CAF50; }
+  .kpi-card.kpi-sell   { border-top: 3px solid #F44336; }
+  .kpi-card.kpi-pnl-pos{ border-top: 3px solid #4CAF50; }
+  .kpi-card.kpi-pnl-neg{ border-top: 3px solid #F44336; }
+
+  /* Signal Intelligence */
+  .sig-intel-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 16px; }
+  @media (max-width: 1050px) { .sig-intel-grid { grid-template-columns: repeat(2,1fr); } }
+  .sig-card { border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--border); }
+  .sig-card-hdr { padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .sig-card-hdr .sig-title { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: .5px; }
+  .sig-card-hdr .sig-count { font-size: 22px; font-weight: 800; color: rgba(255,255,255,.8); }
+  .sig-card-sub { font-size: 11px; color: rgba(255,255,255,.7); margin-top: 1px; }
+  .sig-card-body { background: var(--card); padding: 10px 14px; }
+  .sig-item { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .sig-item:last-child { border-bottom: none; }
+  .sig-item-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+  .sig-item-name { font-weight: 700; font-size: 12px; color: var(--text); }
+  .sig-item-pnl  { font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .sig-item-expl { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .sig-item-link { font-size: 11px; color: var(--accent); text-decoration: none; display: inline-block; margin-top: 3px; }
+  .sig-item-link:hover { text-decoration: underline; }
+  .sig-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 16px 0; }
+  .mkt-tbl-wrap { overflow-x: auto; }
+  .mkt-grade-cell { display: flex; gap: 4px; flex-wrap: wrap; }
+  .grade-pill { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px;
+                white-space: nowrap; }
+
+
+  /* ── Card Thumbnails ─────────────────────────────────── */
+  .ct-wrap { display:flex; align-items:center; gap:8px; }
+  .ct-wrap .ct-info { min-width:0; }
+  .ct-img  { width:36px; height:50px; object-fit:cover; border-radius:4px;
+             border:1px solid var(--border); flex-shrink:0; background:var(--bg);
+             transition: transform .15s; cursor:zoom-in; }
+  .ct-img:hover  { transform:scale(1.08); }
+  .ct-ph   { width:36px; height:50px; border-radius:4px; flex-shrink:0;
+             background:linear-gradient(145deg,#dde2ef,#c8cedf);
+             display:flex; align-items:center; justify-content:center;
+             font-size:20px; border:1px solid var(--border); }
+  .ct-sm .ct-img { width:28px; height:39px; }
+  .ct-sm .ct-ph  { width:28px; height:39px; font-size:16px; }
+  .ct-lg .ct-img { width:48px; height:67px; }
+  .ct-lg .ct-ph  { width:48px; height:67px; font-size:28px; }
+
+
+  /* ── Claude AI Insight Box ───────────────────────────────────── */
+  .ai-box {
+    background: linear-gradient(135deg, #0f1c3a 0%, #1a2d52 50%, #0d1f3a 100%);
+    border: 1px solid rgba(74,144,226,.40);
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 1px rgba(74,144,226,.15), 0 4px 24px rgba(0,0,0,.35),
+                inset 0 1px 0 rgba(255,255,255,.06);
+    margin-bottom: 16px;
+    overflow: hidden;
+    position: relative;
+  }
+  .ai-box::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, #4A90E2, #7BB8FF, #4A90E2, transparent);
+    opacity: .7;
+  }
+  .ai-box-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px 10px;
+    border-bottom: 1px solid rgba(74,144,226,.18);
+  }
+  .ai-box-title {
+    font-size: 12px; font-weight: 700; color: #7BB8FF;
+    text-transform: uppercase; letter-spacing: .9px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ai-pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #4A90E2;
+    box-shadow: 0 0 6px #4A90E2;
+    animation: aiPulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes aiPulse {
+    0%,100% { opacity:1; box-shadow: 0 0 6px #4A90E2; }
+    50%      { opacity:.4; box-shadow: 0 0 14px #7BB8FF; }
+  }
+  .ai-model-badge {
+    font-size: 10px; color: rgba(123,184,255,.6);
+    background: rgba(74,144,226,.12); border: 1px solid rgba(74,144,226,.22);
+    border-radius: 3px; padding: 2px 7px; font-weight: 600; letter-spacing: .4px;
+  }
+  .ai-box-body {
+    padding: 14px 18px 16px;
+    max-height: 230px;
+    overflow-y: auto;
+    line-height: 1.65;
+    font-size: 13px;
+    color: #CBD8F0;
+  }
+  .ai-box-body::-webkit-scrollbar { width: 5px; }
+  .ai-box-body::-webkit-scrollbar-track { background: rgba(255,255,255,.04); border-radius: 3px; }
+  .ai-box-body::-webkit-scrollbar-thumb { background: rgba(74,144,226,.4); border-radius: 3px; }
+  .ai-box-body::-webkit-scrollbar-thumb:hover { background: rgba(74,144,226,.7); }
+  .ai-loading {
+    display: flex; align-items: center; gap: 10px;
+    color: rgba(123,184,255,.65); font-size: 12px; font-style: italic;
+  }
+  .ai-spinner {
+    width: 14px; height: 14px; border: 2px solid rgba(74,144,226,.25);
+    border-top-color: #4A90E2; border-radius: 50%;
+    animation: spin .7s linear infinite; flex-shrink: 0;
+  }
+  .ai-text { white-space: pre-wrap; }
+  .ai-text strong, .ai-text b { color: #fff; }
+  .ai-footer {
+    padding: 7px 18px 10px;
+    font-size: 10px; color: rgba(123,184,255,.35);
+    border-top: 1px solid rgba(74,144,226,.10);
+    font-style: italic;
+  }
+
+  /* ── ADD CARD UI ──────────────────────────────────────────────────── */
+  .add-card-panel { background: var(--card); border-radius: var(--radius); padding: 28px;
+                   box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 28px; }
+
+  .add-card-hero { text-align: center; padding: 50px 20px; }
+  .add-card-icon { font-size: 42px; margin-bottom: 14px; }
+  .add-card-hero h2 { font-size: 22px; color: var(--navy); margin-bottom: 8px; }
+  .add-card-hero p { color: var(--muted); margin-bottom: 28px; font-size: 13px; }
+  .add-card-input-row { display: flex; gap: 10px; max-width: 520px; margin: 0 auto; }
+  .add-card-input { flex: 1; padding: 14px 18px; font-size: 17px; letter-spacing: 1px;
+                    border: 2px solid var(--border); border-radius: 8px; font-family: monospace;
+                    outline: none; transition: border .15s; }
+  .add-card-input:focus { border-color: var(--accent); }
+  .add-card-btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 8px;
+                          padding: 0 26px; font-size: 14px; font-weight: 600; cursor: pointer;
+                          display: flex; align-items: center; gap: 7px; }
+  .add-card-btn-primary:hover { opacity: .88; }
+  .add-card-kbd-hint { margin-top: 14px; color: var(--muted); font-size: 11px; }
+  .add-card-kbd { background: #eef0f5; border: 1px solid var(--border); border-radius: 3px;
+                  padding: 1px 6px; font-family: monospace; font-size: 10px; }
+
+  .add-card-search-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
+                             padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .add-card-cert-display { font-family: monospace; font-size: 18px; font-weight: 700; color: var(--navy); }
+  .add-card-badge { background: var(--accent); color: #fff; padding: 3px 10px;
+                    border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: .5px; }
+  .add-card-source-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .add-card-chip { border: 1px solid var(--border); border-radius: 8px; padding: 18px 16px;
+                   display: flex; align-items: center; gap: 12px; transition: all .3s; }
+  .add-card-chip.pending { background: #f8f9fb; }
+  .add-card-chip.loading { background: #f1f6fd; border-color: var(--accent); }
+  .add-card-chip.done { background: #f0f9f1; border-color: var(--green); }
+  .add-card-chip.error { background: #fdf2f2; border-color: var(--red); }
+  .add-card-chip-icon { width: 34px; height: 34px; border-radius: 50%; background: #e8ecf3;
+                        display: flex; align-items: center; justify-content: center; font-weight: 700;
+                        font-size: 13px; color: var(--muted); }
+  .add-card-chip.done .add-card-chip-icon { background: var(--green); color: #fff; }
+  .add-card-chip.error .add-card-chip-icon { background: var(--red); color: #fff; }
+  .add-card-chip.loading .add-card-chip-icon { background: var(--accent); color: #fff; }
+  .add-card-chip-body .add-card-src { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .add-card-chip-body .add-card-status { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 3px; }
+  .add-card-spinner-mini { width: 14px; height: 14px; border: 2px solid rgba(74,144,226,.25);
+                           border-top-color: var(--accent); border-radius: 50%;
+                           animation: spin .7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .add-card-preview-grid { display: grid; grid-template-columns: 300px 1fr; gap: 28px; }
+  @media (max-width: 780px) { .add-card-preview-grid { grid-template-columns: 1fr; } }
+  .add-card-img-column { display: flex; flex-direction: column; gap: 12px; }
+  .add-card-img-wrap { background: #eef1f7; border: 1px solid var(--border); border-radius: 8px;
+                       aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center;
+                       color: var(--muted); font-size: 11px; font-weight: 600; }
+  .add-card-img-label { font-size: 10px; color: var(--muted); text-align: center; text-transform: uppercase;
+                        letter-spacing: .5px; font-weight: 700; }
+  .add-card-match-badge { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7;
+                          padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+                          text-align: center; }
+
+  .add-card-detail-column h2 { font-size: 20px; color: var(--navy); margin-bottom: 4px; }
+  .add-card-sub { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .add-card-pills { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+  .add-card-pill { background: #eef3fa; color: var(--accent); padding: 3px 10px; border-radius: 12px;
+                   font-size: 11px; font-weight: 700; }
+  .add-card-pill-grade { background: var(--navy); color: #fff; }
+  .add-card-pill-variety { background: #fff3e0; color: #e65100; }
+
+  .add-card-section { margin-top: 22px; }
+  .add-card-section-title { font-size: 11px; font-weight: 700; color: var(--muted);
+                            text-transform: uppercase; letter-spacing: .7px; margin-bottom: 10px; }
+  .add-card-price-row { display: flex; justify-content: space-between; padding: 10px 0;
+                        border-bottom: 1px solid #f0f2f7; font-size: 13px; }
+  .add-card-price-row:last-child { border-bottom: none; }
+  .add-card-src { color: var(--muted); }
+  .add-card-val { font-weight: 700; font-family: monospace; }
+  .add-card-src-tag { font-size: 10px; color: var(--green); margin-left: 6px; font-weight: 600; }
+  .add-card-src-tag-warn { color: var(--orange); }
+
+  .add-card-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+  .add-card-edit-field label { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase;
+                               letter-spacing: .5px; font-weight: 700; margin-bottom: 4px; }
+  .add-card-edit-field input, .add-card-edit-field textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+                                                               border-radius: 6px; font-size: 13px; font-family: inherit;
+                                                               background: #fafbfd; outline: none; }
+  .add-card-edit-field input:focus { border-color: var(--accent); background: #fff; }
+  .add-card-edit-field-wide { grid-column: span 2; }
+
+  .add-card-signal-box { background: linear-gradient(135deg, #e8f5e9, #f0f9f1);
+                         border: 1px solid #a5d6a7; border-radius: 8px; padding: 14px 16px;
+                         display: flex; align-items: center; gap: 14px; }
+  .add-card-signal-chip { background: var(--green); color: #fff; font-weight: 700;
+                          padding: 6px 12px; border-radius: 4px; font-size: 12px; letter-spacing: .5px; }
+  .add-card-signal-text { font-size: 12px; color: var(--text); }
+  .add-card-signal-text strong { color: var(--green); }
+
+  .add-card-action-row { display: flex; gap: 10px; justify-content: flex-end;
+                         margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .add-card-btn-secondary { background: #fff; border: 1px solid var(--border); color: var(--text);
+                            padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .add-card-btn-secondary:hover { background: #f8f9fb; }
+  .add-card-btn-danger { background: #fff; border: 1px solid #e5a8a5; color: var(--red);
+                         padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .add-card-btn-success { background: var(--green); color: #fff; border: none;
+                          padding: 10px 22px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+  .add-card-saved-banner { background: linear-gradient(135deg, #e8f5e9, #f0f9f1);
+                           border: 1px solid var(--green); border-radius: var(--radius);
+                           padding: 32px; text-align: center; }
+  .add-card-check { width: 56px; height: 56px; border-radius: 50%; background: var(--green);
+                    color: #fff; display: flex; align-items: center; justify-content: center;
+                    font-size: 28px; margin: 0 auto 14px; }
+  .add-card-saved-banner h3 { color: var(--navy); font-size: 18px; margin-bottom: 6px; }
+  .add-card-saved-banner p { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .add-card-saved-links { display: flex; gap: 10px; justify-content: center; }
+  .add-card-saved-link { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 13px;
+                         padding: 8px 16px; border: 1px solid var(--accent); border-radius: 6px; cursor: pointer; }
+  .add-card-saved-link:hover { background: var(--accent); color: #fff; }
+
+  /* Live search styles */
+  .search-hero { text-align: center; padding: 50px 20px; }
+  .search-icon { font-size: 42px; margin-bottom: 14px; }
+  .search-hero h2 { font-size: 22px; color: var(--navy); margin-bottom: 8px; }
+  .search-hero p { color: var(--muted); margin-bottom: 28px; font-size: 13px; }
+  .search-wrap { max-width: 880px; margin: 0 auto; position: relative;
+                 display: flex; gap: 8px; align-items: stretch; }
+  .search-results { max-width: 1100px; margin-left: auto; margin-right: auto; }
+  .search-input { flex: 1; padding: 14px 18px; font-size: 17px; border: 1px solid var(--border);
+                  border-radius: 8px; box-sizing: border-box; }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .grade-select { padding: 0 14px; font-size: 15px; font-weight: 700; color: var(--navy);
+                  border: 1px solid var(--border); border-radius: 8px; background: #fff;
+                  cursor: pointer; min-width: 110px; }
+  .grade-select:focus { outline: none; border-color: var(--accent); }
+  .search-state { position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+                  display: flex; align-items: center; gap: 6px; }
+  .chip-mini { background: #e3f2fd; color: var(--accent); padding: 3px 8px; border-radius: 4px;
+               font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .err-chip { background: #ffebee; color: var(--red); padding: 3px 8px; border-radius: 4px;
+              font-size: 11px; font-weight: 600; }
+  .spinner-mini { width: 14px; height: 14px; border: 2px solid rgba(74,144,226,.25);
+                  border-right-color: var(--accent); border-radius: 50%;
+                  animation: spin 0.8s linear infinite; }
+  .search-results { margin-top: 16px; border: 1px solid var(--border); border-radius: 10px;
+                    background: var(--card); max-height: 720px; overflow-y: auto; }
+  .result-card { display: flex; gap: 12px; padding: 12px; border-bottom: 1px solid #f0f2f7;
+                 cursor: pointer; transition: background 0.15s, transform 0.15s; }
+  .result-card:hover { background: #f4f7fc; transform: translateX(2px); }
+  .result-card:last-child { border-bottom: none; }
+  .result-thumb { width: 60px; height: 72px; object-fit: cover; border-radius: 4px;
+                  background: #eef1f7; flex-shrink: 0; }
+  .result-body { flex: 1; min-width: 0; }
+  .result-title { font-size: 14px; font-weight: 600; color: var(--navy); overflow: hidden;
+                  text-overflow: ellipsis; white-space: nowrap; }
+  .result-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .result-tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+  .tag { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px;
+         font-weight: 600; }
+  .tag-collectr { background: #e3f2fd; color: var(--accent); }
+  .tag-ebay { background: #fff3e0; color: #e65100; }
+  .tag-owned { background: #e8f5e9; color: var(--green); }
+  .tag-external { background: #ede7f6; color: #4527A0; }
+  .tag-local { background: #f0f2f7; color: var(--muted); }
+  .result-price { text-align: right; flex-shrink: 0; }
+  .price-val { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .price-src { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  /* New 2-column layout: External shops (wider) + Selected-grade matches */
+  .search-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; padding: 14px; }
+  .grade-col { background: #f8f9fb; border-radius: 8px; padding: 10px; min-height: 120px; }
+  .grade-col.ext-col { background: linear-gradient(180deg,#f5f0ff 0%,#f8f9fb 70%);
+                       border: 1px solid #e6dcfb; }
+  .grade-col-hdr { font-size: 12px; font-weight: 700; color: var(--navy); padding: 6px 8px 10px;
+                   border-bottom: 1px solid var(--border); margin-bottom: 8px;
+                   display: flex; justify-content: space-between; align-items: center; }
+  .grade-col-hdr .count { background: var(--accent); color: #fff; font-size: 10px;
+                          padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .grade-col.ext-col .grade-col-hdr .count { background: #6A3DE8; }
+  .grade-col .result-card { padding: 10px; background: var(--card); border-radius: 6px;
+                            margin-bottom: 8px; border-bottom: none;
+                            box-shadow: 0 1px 2px rgba(27,42,74,.04); }
+  .grade-col .result-card:last-child { margin-bottom: 0; }
+  .grade-col .result-thumb { width: 48px; height: 58px; }
+  .grade-col .result-title { font-size: 13px; }
+  .grade-col .result-meta { font-size: 11px; }
+  .grade-col .price-val { font-size: 13px; }
+  .grade-col .result-tags { margin-top: 4px; }
+  .grade-col-empty { color: var(--muted); font-size: 12px; text-align: center;
+                     padding: 24px 8px; font-style: italic; }
+  /* External shop card — logo-ish left block */
+  .ext-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+              background: var(--card); border-radius: 6px; margin-bottom: 8px;
+              box-shadow: 0 1px 2px rgba(27,42,74,.04); text-decoration: none; color: inherit;
+              transition: background 0.15s, transform 0.15s; }
+  .ext-card:hover { background: #f4f7fc; transform: translateX(2px); }
+  .ext-logo { width: 44px; height: 44px; border-radius: 6px; display: flex;
+              align-items: center; justify-content: center; font-size: 18px; font-weight: 800;
+              color: #fff; flex-shrink: 0; }
+  .ext-body { flex: 1; min-width: 0; }
+  .ext-name { font-size: 14px; font-weight: 700; color: var(--navy); }
+  .ext-sub { font-size: 11px; color: var(--muted); margin-top: 2px; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; }
+  .ext-arrow { color: var(--muted); font-size: 18px; font-weight: 700; margin-left: 6px; }
+  @media (max-width: 900px) { .search-grid { grid-template-columns: 1fr; } }
+  .no-results { padding: 20px; text-align: center; color: var(--muted); font-size: 13px; }
+  .hint { margin-top: 12px; color: var(--muted); font-size: 12px; }
+
+  /* ── P&L Performance Dashboard ───────────────────────────── */
+  #pnl-banner { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 13px; color: #856404; }
+  #pnl-container { display: flex; flex-direction: column; gap: 16px; max-width: 1600px; margin: 0 auto; }
+  .pnl-kpi-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+  .pnl-kpi-tile { background: white; padding: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 120px; }
+  .pnl-kpi-label { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .pnl-kpi-value { font-size: 20px; font-weight: 700; color: #222; line-height: 1.2; }
+  .pnl-kpi-value.positive { color: #2ECC71; }
+  .pnl-kpi-value.negative { color: #E74C3C; }
+  .pnl-kpi-sub { font-size: 12px; color: #777; margin-top: 4px; }
+  .pnl-panels-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .pnl-panel { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); padding: 16px; display: flex; flex-direction: column; min-height: 340px; }
+  .pnl-panel-title { font-size: 13px; font-weight: 700; color: #222; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .pnl-toggle-group { display: flex; gap: 8px; }
+  .pnl-toggle-btn { font-size: 11px; padding: 4px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+  .pnl-toggle-btn:hover { background: #e0e0e0; }
+  .pnl-toggle-btn.active { background: #2ECC71; color: white; border-color: #2ECC71; }
+  .pnl-chart-container { flex: 1; position: relative; min-height: 250px; }
+  .pnl-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#90A4AE; font-size:12px; text-align:center; padding:16px; pointer-events:none; }
+
+  .pnl-forecast-row { display: grid; grid-template-columns: 220px 1fr; gap: 16px; min-height: 500px; }
+  .pnl-scenario-panel { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .pnl-scenario-title { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #999; margin-bottom: 4px; }
+  .pnl-scenario-switch { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .pnl-switch-checkbox { position: relative; display: inline-block; width: 40px; height: 24px; }
+  .pnl-switch-checkbox input { opacity: 0; width: 0; height: 0; }
+  .pnl-switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+  .pnl-switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+  .pnl-switch-checkbox input:checked + .pnl-switch-slider { background-color: #2ECC71; }
+  .pnl-switch-checkbox input:checked + .pnl-switch-slider:before { transform: translateX(16px); }
+  .pnl-reset-btn { width: 100%; padding: 8px; background: #E74C3C; color: white; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 12px; }
+  .pnl-reset-btn:hover { background: #c0392b; }
+  .pnl-forecast-content { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); padding: 16px; display: flex; flex-direction: column; }
+  .pnl-forecast-charts { flex: 1; display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+  .pnl-forecast-main { display: flex; flex-direction: column; gap: 12px; }
+  .pnl-monte-carlo-chart { flex: 1; min-height: 250px; position: relative; }
+  .pnl-waterfall-chart { height: 180px; position: relative; }
+  .pnl-recommendation-table { display: flex; flex-direction: column; font-size: 11px; max-height: 100%; overflow-y: auto; }
+  .pnl-rec-header { font-weight: 700; text-transform: uppercase; color: #999; display: grid; grid-template-columns: 1fr 50px 60px 50px 40px; gap: 4px; padding: 8px 4px; border-bottom: 1px solid #eee; margin-bottom: 8px; font-size: 10px; }
+  .pnl-rec-row { display: grid; grid-template-columns: 1fr 50px 60px 50px 40px; gap: 4px; padding: 6px 4px; border-bottom: 1px solid #f5f5f5; align-items: center; }
+  .pnl-rec-card { font-weight: 600; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pnl-rec-value { text-align: right; color: #666; font-size: 10px; }
+  .pnl-rec-action { font-weight: 600; text-align: center; padding: 3px 4px; border-radius: 3px; font-size: 9px; }
+  .pnl-action-buy { background: #d4edda; color: #155724; }
+  .pnl-action-hold { background: #cce5ff; color: #004085; }
+  .pnl-action-sell { background: #f8d7da; color: #721c24; }
+  .pnl-action-upgrade { background: #fff3cd; color: #856404; }
+  @media (max-width: 1200px) { .pnl-panels-row, .pnl-forecast-row { grid-template-columns: 1fr; } .pnl-forecast-charts { grid-template-columns: 1fr; } }
+  @media (max-width: 768px) { .pnl-kpi-strip { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); } .pnl-panels-row { grid-template-columns: 1fr; } .pnl-forecast-row { grid-template-columns: 1fr; } .pnl-forecast-charts { grid-template-columns: 1fr; } }
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+</head>
+<body>
+
+<!-- ── Top Navigation Bar ──────────────────────────────────────────────── -->
+<nav class="topbar">
+  <div class="brand">
+    <span class="brand-icon">🃏</span>
+    <span>PSA × Collectr Tracer</span>
+  </div>
+
+  <div class="nav-tabs" role="tablist" aria-label="Main navigation">
+    <div class="nav-tab active" data-tab="dashboard" role="tab" aria-selected="true" aria-controls="tab-dashboard" tabindex="0">📊 Dashboard</div>
+    <div class="nav-tab" data-tab="portfolio" role="tab" aria-selected="false" aria-controls="tab-portfolio" tabindex="-1">📋 Portfolio</div>
+    <div class="nav-tab" data-tab="add-card" role="tab" aria-selected="false" aria-controls="tab-add-card" tabindex="-1">➕ Add Card</div>
+    <div class="nav-tab" data-tab="collectr" role="tab" aria-selected="false" aria-controls="tab-collectr" tabindex="-1">🔗 Collectr</div>
+    <div class="nav-tab" data-tab="insights" role="tab" aria-selected="false" aria-controls="tab-insights" tabindex="-1">💡 Insights</div>
+    <div class="nav-tab" data-tab="exceptions" role="tab" aria-selected="false" aria-controls="tab-exceptions" tabindex="-1">⚠️ Exceptions</div>
+    <div class="nav-tab" data-tab="pnl-performance" role="tab" aria-selected="false" aria-controls="tab-pnl-performance" tabindex="-1">💹 P&L Performance</div>
+  </div>
+
+  <div class="refresh-area">
+    <div class="refresh-status" id="refresh-status">
+      <span class="ext-spinner"></span>
+      <span class="step-text" id="step-text">Connecting…</span>
+    </div>
+    <div class="ts-label">
+      Last refresh<br>
+      <span class="ts-val" id="ts-display">—</span>
+      <span id="src-badge" style="font-size:10px;margin-left:4px;font-weight:700"></span>
+    </div>
+    <button class="btn-refresh" id="btn-refresh" onclick="doRefresh()" aria-label="Refresh portfolio data from Collectr">
+      <span class="btn-icon" aria-hidden="true">↻</span>
+      <span class="btn-spinner" aria-hidden="true"></span>
+      Refresh Data
+    </button>
+  </div>
+</nav>
+
+<!-- ── Main Content ────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- DASHBOARD ────────────────────────────────────────────────────── -->
+  <div class="tab-panel active" id="tab-dashboard">
+    <div id="dashboard-empty" class="state-banner">
+      <h3>No data loaded</h3>
+      <p>Click <strong>Refresh Data</strong> in the top-right to fetch your latest Collectr prices.</p>
+    </div>
+    <div id="dashboard-content" style="display:none">
+
+      <!-- KPI Row -->
+      <div class="kpi-grid" id="kpi-grid" style="margin-bottom:16px"></div>
+      <!-- Claude Haiku AI Insight Box -->
+      <div class="ai-box" id="ai-insight-box" style="display:none">
+        <div class="ai-box-hdr">
+          <div class="ai-box-title">
+            <span class="ai-pulse"></span>
+            Claude Haiku — AI Investment Briefing
+          </div>
+          <span class="ai-model-badge">claude-haiku-4-5</span>
+        </div>
+        <div class="ai-box-body" id="ai-box-body">
+          <div class="ai-loading" id="ai-loading">
+            <span class="ai-spinner"></span>
+            Analyzing portfolio… crafting your briefing
+          </div>
+          <div class="ai-text" id="ai-text" style="display:none"></div>
+        </div>
+        <div class="ai-footer" id="ai-footer" style="display:none">
+          Generated by Claude Haiku · Values in THB · Not financial advice
+        </div>
+      </div>
+
+
+
+      <!-- P&L Performance Chart + Market Outperformers (50/50 split) -->
+      <div class="dash-split">
+        <div class="panel">
+          <div class="panel-title">📊 P&amp;L Performance by Card — All 19 Positions</div>
+          <span class="chart-note">Sorted by P&amp;L% · Green = above cost · Red = below cost · 🟢 BUY · 🔵 HOLD · 🔴 SELL · 🟠 REVIEW</span>
+          <div class="chart-wrap" style="height:170px"><canvas id="chart-pnl"></canvas></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title outp-hdr-row">
+            <span>🏆 Top 10 Pokémon TCG Market</span>
+            <span id="outp-sources" class="outp-sources"></span>
+          </div>
+          <span class="chart-note">Live global ranking via pokemontcg.io (CardMarket trend + TCGPlayer) · multi-source hooks ready for eBay · PSA · PriceCharting · SNKR</span>
+          <div class="outp-list" id="outp-list">
+            <div class="outp-empty">No data yet — refresh portfolio to populate.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cost vs MV + Donuts -->
+      <div class="dash-mid">
+        <div class="panel">
+          <div class="panel-title">💰 Cost vs Market Value (฿ THB)</div>
+          <span class="chart-note">Blue = purchase cost · Teal/Red = current market value</span>
+          <div class="chart-wrap" style="height:270px"><canvas id="chart-costmv"></canvas></div>
+        </div>
+        <div class="dash-mid-right">
+          <div class="panel" style="flex:1">
+            <div class="panel-title" style="margin-bottom:8px">📡 Signal Mix</div>
+            <div class="chart-wrap" style="height:110px"><canvas id="chart-signal"></canvas></div>
+            <div id="signal-legend" style="margin-top:6px;font-size:10px"></div>
+          </div>
+          <div class="panel" style="flex:1">
+            <div class="panel-title" style="margin-bottom:8px">⚠️ Risk Mix</div>
+            <div class="chart-wrap" style="height:110px"><canvas id="chart-risk"></canvas></div>
+            <div id="risk-legend" style="margin-top:6px;font-size:10px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PSA Grade Ladder -->
+      <div class="panel dash-full">
+        <div class="panel-title">🎯 PSA Grade Price Ladder (฿ THB) — Upgrade Potential</div>
+        <span class="chart-note">Live Collectr prices for PSA 8 / PSA 9 / PSA 10 — larger spread = higher grade premium</span>
+        <div class="chart-wrap" style="height:260px"><canvas id="chart-grade"></canvas></div>
+      </div>
+
+      <!-- Signal Intelligence -->
+      <div class="panel-title" style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--navy);margin-bottom:12px">🧠 Signal Intelligence — Position Breakdown</div>
+      <div class="sig-intel-grid" id="signal-intel"></div>
+
+      <!-- Market Price Table -->
+      <div class="panel">
+        <div class="panel-title">📋 Full Market Price Sheet — Live Collectr Prices + Links</div>
+        <div class="mkt-tbl-wrap">
+          <table id="mkt-table" style="font-size:12px" aria-label="Full market price sheet with live Collectr prices">
+            <thead><tr>
+              <th role="columnheader">#</th><th role="columnheader">Card</th><th role="columnheader">Grade</th><th role="columnheader">My Cost (฿)</th>
+              <th role="columnheader">Live Price (฿)</th><th role="columnheader">PSA Est (฿)</th>
+              <th role="columnheader">P&amp;L (฿)</th><th role="columnheader">P&amp;L %</th>
+              <th role="columnheader">PSA 8 / 9 / 10 (฿)</th><th role="columnheader">Signal</th><th role="columnheader">Collectr</th>
+            </tr></thead>
+            <tbody id="mkt-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <!-- PORTFOLIO ──────────────────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-portfolio">
+
+    <!-- Legend box (always visible) -->
+    <div class="legend-panel">
+      <div class="legend-hdr open" id="legend-hdr" onclick="toggleLegend()" role="button" tabindex="0" aria-expanded="true" aria-controls="legend-body">
+        <span>📖 Signal, Risk &amp; Confidence — Legend</span>
+        <span class="legend-chevron open" id="legend-chevron" aria-hidden="true">▼</span>
+      </div>
+      <div class="legend-body open" id="legend-body">
+
+        <!-- SIGNAL column -->
+        <div class="legend-col">
+          <div class="legend-col-title">Signal</div>
+          <div class="legend-row">
+            <div class="legend-lbl"><span class="badge" style="background:#4CAF50">BUY</span></div>
+            <span>Strong upside — market value well above cost. Consider adding to position.</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-lbl"><span class="badge" style="background:#2196F3">HOLD</span></div>
+            <span>Stable — price near cost or modestly positive. Maintain current holding.</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-lbl"><span class="badge" style="background:#F44336">SELL</span></div>
+            <span>Declining value — market below cost or negative trend. Consider exiting.</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-lbl"><span class="badge" style="background:#FF9800">REVIEW</span></div>
+            <span>Incomplete data or low confidence. Verify manually before deciding.</span>
+          </div>
+        </div>
+
+        <div class="legend-div"></div>
+
+        <!-- RISK column -->
+        <div class="legend-col">
+          <div class="legend-col-title">Risk</div>
+          <div class="legend-row">
+            <div class="legend-lbl" style="color:#4CAF50;font-weight:700;font-size:12px">LOW</div>
+            <span>Well-established card with strong liquidity and reliable pricing data.</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-lbl" style="color:#FF9800;font-weight:700;font-size:12px">MEDIUM</div>
+            <span>Some price volatility or limited market depth. Monitor periodically.</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-lbl" style="color:#F44336;font-weight:700;font-size:12px">HIGH</div>
+            <span>Low confidence, missing data, or high price swings. Handle with caution.</span>
+          </div>
+        </div>
+
+        <div class="legend-div"></div>
+
+        <!-- CONFIDENCE column -->
+        <div class="legend-col">
+          <div class="legend-col-title">Confidence %</div>
+          <div class="legend-row">
+            <div class="legend-lbl" style="font-weight:700;font-size:12px">95%</div>
+            <span><strong>High</strong> — price sourced directly from Collectr with a full card match.</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-lbl" style="font-weight:700;font-size:12px">50%</div>
+            <span><strong>Medium</strong> — partial match or estimated from similar listings.</span>
+          </div>
+          <div class="legend-row">
+            <div class="legend-lbl" style="font-weight:700;font-size:12px">30%</div>
+            <span><strong>Low</strong> — no Collectr match found; PSA estimate used as proxy.</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- /legend -->
+
+    <div id="portfolio-empty" class="state-banner">
+      <h3>No portfolio data</h3>
+      <p>Click <strong>Refresh Data</strong> to load your 19-card collection.</p>
+    </div>
+    <div id="portfolio-content" class="tbl-wrap panel" style="display:none">
+      <table id="portfolio-table" aria-label="Portfolio cards with pricing and signals">
+        <thead><tr>
+          <th class="sortable" data-key="__idx" onclick="sortPort(this)" aria-sort="none" role="columnheader">#<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="subject" onclick="sortPort(this)" aria-sort="none" role="columnheader">Subject<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="set_code" onclick="sortPort(this)" aria-sort="none" role="columnheader">Set / Year<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="card_number" onclick="sortPort(this)" aria-sort="none" role="columnheader">Card #<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="grade" onclick="sortPort(this)" aria-sort="none" role="columnheader">Grade<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="my_cost" onclick="sortPort(this)" aria-sort="none" role="columnheader">Cost (฿)<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="market_value" onclick="sortPort(this)" aria-sort="none" role="columnheader">Market Value (฿)<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="pnl" onclick="sortPort(this)" aria-sort="none" role="columnheader">P&amp;L (฿)<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="pnl_pct" onclick="sortPort(this)" aria-sort="none" role="columnheader">P&amp;L %<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="confidence" onclick="sortPort(this)" aria-sort="none" role="columnheader">Confidence<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="signal" onclick="sortPort(this)" aria-sort="none" role="columnheader">Signal<span class="sort-arr" aria-hidden="true">↕</span></th>
+          <th class="sortable" data-key="risk_level" onclick="sortPort(this)" aria-sort="none" role="columnheader">Risk<span class="sort-arr" aria-hidden="true">↕</span></th>
+        </tr></thead>
+        <tbody id="portfolio-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ADD CARD ───────────────────────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-add-card">
+    <!-- Empty State -->
+    <div id="add-card-empty">
+      <div class="add-card-panel">
+        <div class="search-hero">
+          <div class="search-icon">🔎</div>
+          <h2>Find a Pokemon card</h2>
+          <p>Start typing — name, set, card #, year. Paste a PSA cert # for direct lookup. Pick your grade to filter.</p>
+          <div class="search-wrap">
+            <select id="grade-filter" class="grade-select" title="Filter by PSA grade">
+              <option value="10" selected>PSA 10</option>
+              <option value="9">PSA 9</option>
+              <option value="8">PSA 8</option>
+            </select>
+            <input id="add-card-query" class="search-input"
+                   placeholder="e.g. slowpoke art rare · 2023 · or cert 131858430"
+                   autocomplete="off" />
+            <span id="search-state" class="search-state"></span>
+          </div>
+          <div id="search-results" class="search-results" style="display:none">
+            <!-- external shop cards + local matches rendered here -->
+          </div>
+          <div id="search-empty-hint" class="hint">Type 3+ characters to search — external shops shown first</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Searching State -->
+    <div id="add-card-searching" style="display:none">
+      <div class="add-card-panel">
+        <div class="add-card-search-header">
+          <span class="add-card-badge">CERT</span>
+          <span class="add-card-cert-display" id="add-card-cert-display">—</span>
+          <span style="color:var(--muted);font-size:12px;margin-left:auto">
+            <span class="add-card-spinner-mini"></span> Fetching from 3 sources…
+          </span>
+        </div>
+        <div class="add-card-source-chips">
+          <div class="add-card-chip pending" id="add-card-chip-psa">
+            <div class="add-card-chip-icon">…</div>
+            <div class="add-card-chip-body">
+              <div class="add-card-src">PSA Cert</div>
+              <div class="add-card-status">Queued…</div>
+            </div>
+          </div>
+          <div class="add-card-chip pending" id="add-card-chip-collectr">
+            <div class="add-card-chip-icon">…</div>
+            <div class="add-card-chip-body">
+              <div class="add-card-src">Collectr Live</div>
+              <div class="add-card-status">Queued…</div>
+            </div>
+          </div>
+          <div class="add-card-chip pending" id="add-card-chip-ebay">
+            <div class="add-card-chip-icon">…</div>
+            <div class="add-card-chip-body">
+              <div class="add-card-src">eBay Sold</div>
+              <div class="add-card-status">Queued…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview State -->
+    <div id="add-card-preview" style="display:none">
+      <div class="add-card-panel">
+        <div class="add-card-preview-grid">
+          <!-- LEFT: images -->
+          <div class="add-card-img-column">
+            <div class="add-card-img-wrap" id="add-card-psa-img">PSA CERT IMAGE</div>
+            <div class="add-card-img-label">PSA Official</div>
+            <div class="add-card-img-wrap" id="add-card-collectr-img">COLLECTR IMAGE</div>
+            <div class="add-card-img-label">Collectr Product</div>
+            <div class="add-card-match-badge" id="add-card-match-badge" style="display:none">✓ Image match · visual hash OK</div>
+          </div>
+
+          <!-- RIGHT: details -->
+          <div class="add-card-detail-column">
+            <h2 id="add-card-subject-display">Card Name</h2>
+            <div class="add-card-sub" id="add-card-sub-display">Card details</div>
+            <div class="add-card-pills" id="add-card-pills"></div>
+
+            <div class="add-card-section">
+              <div class="add-card-section-title">Market (3 sources merged)</div>
+              <div class="add-card-price-row">
+                <span class="add-card-src">Collectr live</span>
+                <span><span class="add-card-val" id="add-card-collectr-price">—</span><span class="add-card-src-tag" id="add-card-collectr-tag">—</span></span>
+              </div>
+              <div class="add-card-price-row">
+                <span class="add-card-src">PSA estimate</span>
+                <span><span class="add-card-val" id="add-card-psa-estimate">—</span><span class="add-card-src-tag add-card-src-tag-warn">est.</span></span>
+              </div>
+              <div class="add-card-price-row">
+                <span class="add-card-src">eBay sold (avg)</span>
+                <span><span class="add-card-val" id="add-card-ebay-price">—</span><span class="add-card-src-tag" id="add-card-ebay-tag">—</span></span>
+              </div>
+            </div>
+
+            <div class="add-card-section">
+              <div class="add-card-section-title">My Info (editable)</div>
+              <div class="add-card-edit-grid">
+                <div class="add-card-edit-field">
+                  <label>My Cost (฿)</label>
+                  <input type="number" id="add-card-my-cost" placeholder="e.g. 720">
+                </div>
+                <div class="add-card-edit-field">
+                  <label>Date Acquired</label>
+                  <input type="date" id="add-card-date-acquired">
+                </div>
+                <div class="add-card-edit-field">
+                  <label>Source</label>
+                  <input type="text" id="add-card-source" placeholder="e.g. Mercari">
+                </div>
+                <div class="add-card-edit-field">
+                  <label>Item Status</label>
+                  <input type="text" id="add-card-item-status" value="Active">
+                </div>
+                <div class="add-card-edit-field add-card-edit-field-wide">
+                  <label>Notes</label>
+                  <input type="text" id="add-card-notes" placeholder="Any personal notes…">
+                </div>
+              </div>
+            </div>
+
+            <div class="add-card-section">
+              <div class="add-card-section-title">Signal Preview</div>
+              <div class="add-card-signal-box" id="add-card-signal-box">
+                <span class="add-card-signal-chip" id="add-card-signal-chip">—</span>
+                <span class="add-card-signal-text" id="add-card-signal-text">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="add-card-action-row">
+          <button class="add-card-btn-danger" onclick="doAddCardCancel()">✕ Cancel</button>
+          <button class="add-card-btn-secondary" onclick="doAddCardEdit()">✎ Edit more</button>
+          <button class="add-card-btn-success" onclick="doAddCardApprove()">✓ Approve & Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saved State -->
+    <div id="add-card-saved" style="display:none">
+      <div class="add-card-panel">
+        <div class="add-card-saved-banner">
+          <div class="add-card-check">✓</div>
+          <h3 id="add-card-saved-title">Card saved to master workbook</h3>
+          <p id="add-card-saved-text">Row appended to <strong>Portfolio_Master.xlsx</strong> › Cards sheet · Dashboard refreshing…</p>
+          <div class="add-card-saved-links">
+            <a class="add-card-saved-link" href="#" onclick="switchTab('portfolio'); return false;">View in Portfolio →</a>
+            <a class="add-card-saved-link" href="#" onclick="doAddCardReset(); return false;">➕ Add another</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLLECTR ────────────────────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-collectr">
+    <div id="collectr-empty" class="state-banner">
+      <h3>No Collectr data</h3>
+      <p>Click <strong>Refresh Data</strong> to load Collectr market prices.</p>
+    </div>
+    <div id="collectr-content" class="tbl-wrap panel" style="display:none">
+      <table id="collectr-table" aria-label="Collectr market data with prices">
+        <thead><tr>
+          <th role="columnheader">#</th><th role="columnheader">Subject</th><th role="columnheader">Card #</th><th role="columnheader">Grade</th>
+          <th role="columnheader">Collectr Price (฿)</th><th role="columnheader">PSA Estimate (฿)</th>
+          <th role="columnheader">Source</th><th role="columnheader">Collectr Link</th>
+        </tr></thead>
+        <tbody id="collectr-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- INSIGHTS ────────────────────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-insights">
+    <div id="insights-empty" class="state-banner">
+      <h3>No insights available</h3>
+      <p>Click <strong>Refresh Data</strong> to generate portfolio signals.</p>
+    </div>
+    <div id="insights-content" style="display:none">
+      <div class="ins-grid">
+        <div class="panel">
+          <div class="panel-title">🏆 Top Gainers (by Cost Basis)</div>
+          <div id="ins-gainers"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">📈 Best Upside (P&L %)</div>
+          <div id="ins-undervalued"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">📉 Weak Positions</div>
+          <div id="ins-weak"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">⚠️ High Risk Cards</div>
+          <div id="ins-risk"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXCEPTIONS ──────────────────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-exceptions">
+    <div id="exceptions-empty" class="state-banner">
+      <h3>No exceptions</h3>
+      <p>All cards processed cleanly — or refresh has not run yet.</p>
+    </div>
+    <div id="exceptions-content" style="display:none">
+      <div id="exc-list"></div>
+    </div>
+  </div>
+
+  <!-- P&L PERFORMANCE ──────────────────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-pnl-performance">
+    <div id="pnl-banner">🔬 Snapshot mode — all numbers reconcile with your Portfolio tab. Scenarios apply model-based transforms; not financial advice. <span style="font-size:11px;margin-left:16px">reconciles with Portfolio ✓</span></div>
+    <div id="pnl-container">
+      <div class="pnl-kpi-strip">
+        <div class="pnl-kpi-tile"><div class="pnl-kpi-label">Portfolio NAV</div><div class="pnl-kpi-value" id="kpi-nav">0</div><div class="pnl-kpi-sub">THB</div></div>
+        <div class="pnl-kpi-tile"><div class="pnl-kpi-label">Unrealized P&L</div><div class="pnl-kpi-value" id="kpi-pnl">0</div><div class="pnl-kpi-sub" id="kpi-pnl-pct">0%</div></div>
+        <div class="pnl-kpi-tile"><div class="pnl-kpi-label">Winners</div><div class="pnl-kpi-value" id="kpi-winners">0</div></div>
+        <div class="pnl-kpi-tile"><div class="pnl-kpi-label">Losers</div><div class="pnl-kpi-value" id="kpi-losers">0</div></div>
+        <div class="pnl-kpi-tile"><div class="pnl-kpi-label">Avg Confidence</div><div class="pnl-kpi-value" id="kpi-avg-conf">0%</div></div>
+        <div class="pnl-kpi-tile"><div class="pnl-kpi-label">Top Concentration</div><div class="pnl-kpi-value" id="kpi-top-conc">0%</div></div>
+        <div class="pnl-kpi-tile"><div class="pnl-kpi-label">POP Alerts</div><div class="pnl-kpi-value" id="kpi-alerts">0</div></div>
+      </div>
+      <div class="pnl-panels-row">
+        <div class="pnl-panel"><div class="pnl-panel-title">Winners & Losers</div><div class="pnl-chart-container"><canvas id="chart-winnerslosers"></canvas><div id="empty-winnerslosers" class="pnl-empty">Visit the Dashboard tab to load portfolio data first.</div></div></div>
+        <div class="pnl-panel"><div class="pnl-panel-title">Cost vs Market Value</div><div class="pnl-chart-container"><canvas id="chart-costvalue"></canvas><div id="empty-costvalue" class="pnl-empty">Visit the Dashboard tab to load portfolio data first.</div></div></div>
+        <div class="pnl-panel"><div class="pnl-panel-title">Signal Breakdown</div><div class="pnl-chart-container"><canvas id="chart-signals"></canvas><div id="empty-signals" class="pnl-empty">Visit the Dashboard tab to load portfolio data first.</div></div></div>
+      </div>
+      <div class="pnl-forecast-row">
+        <div class="pnl-scenario-panel">
+          <div class="pnl-scenario-title">Scenarios</div>
+          <div class="pnl-scenario-switch"><label class="pnl-switch-checkbox"><input type="checkbox" data-scenario="bull"><span class="pnl-switch-slider"></span></label><span>Bull (+30%)</span></div>
+          <div class="pnl-scenario-switch"><label class="pnl-switch-checkbox"><input type="checkbox" data-scenario="bear"><span class="pnl-switch-slider"></span></label><span>Bear (-25%)</span></div>
+          <div class="pnl-scenario-switch"><label class="pnl-switch-checkbox"><input type="checkbox" data-scenario="pop"><span class="pnl-switch-slider"></span></label><span>POP Dilution</span></div>
+          <div class="pnl-scenario-switch"><label class="pnl-switch-checkbox"><input type="checkbox" data-scenario="grade"><span class="pnl-switch-slider"></span></label><span>Grade Upgrade</span></div>
+          <div class="pnl-scenario-switch"><label class="pnl-switch-checkbox"><input type="checkbox" data-scenario="jpy-up"><span class="pnl-switch-slider"></span></label><span>JPY/THB +10%</span></div>
+          <div class="pnl-scenario-switch"><label class="pnl-switch-checkbox"><input type="checkbox" data-scenario="jpy-down"><span class="pnl-switch-slider"></span></label><span>JPY/THB -10%</span></div>
+          <div class="pnl-scenario-switch"><label class="pnl-switch-checkbox"><input type="checkbox" data-scenario="liq"><span class="pnl-switch-slider"></span></label><span>Liquidity Shock</span></div>
+          <button class="pnl-reset-btn" onclick="pnlApp.resetScenarios()">Reset All</button>
+          <div id="pnl-scenario-impact" style="margin-top:16px;padding:12px;background:#f5f5f5;border-radius:6px;font-size:12px;display:none">
+            <div style="font-weight:600;margin-bottom:8px">Scenario Impact</div>
+            <div>NAV: <span id="scenario-nav-delta">+0 ฿</span></div>
+            <div>P&L: <span id="scenario-pnl-delta">+0 ฿</span></div>
+          </div>
+        </div>
+        <div class="pnl-forecast-content">
+          <div class="pnl-action-table">
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead>
+                  <tr style="border-bottom:2px solid var(--border);background:#fafafa">
+                    <th style="text-align:left;padding:8px;font-weight:600">Card</th>
+                    <th style="text-align:right;padding:8px;font-weight:600">Cost (฿)</th>
+                    <th style="text-align:right;padding:8px;font-weight:600">Market Value (฿)</th>
+                    <th style="text-align:right;padding:8px;font-weight:600">P&L (฿)</th>
+                    <th style="text-align:right;padding:8px;font-weight:600">P&L %</th>
+                    <th style="text-align:center;padding:8px;font-weight:600">Signal</th>
+                    <th style="text-align:center;padding:8px;font-weight:600">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="action-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.main -->
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<script>
+
+/* ── Card thumbnail helper ───────────────────────────────────────────── */
+// All Collectr images served from local disk cache via /card-img/<product_id>
+// (downloaded once at startup — no CDN dependency, no CORS/referer issues)
+const _CARD_IMG = {
+  'SLOWPOKE|082': 'https://public.getcollectr.com/public-assets/products/product_10010852.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'PSYDUCK|175': 'https://public.getcollectr.com/public-assets/products/product_10012098.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'CHARIZARD EX|349': 'https://public.getcollectr.com/public-assets/products/product_10013016.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'MAGIKARP|080': 'https://public.getcollectr.com/public-assets/products/product_10011603.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'FULL ART/PIKACHU|001': 'https://public.getcollectr.com/public-assets/products/product_577896.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'PIKACHU|020': 'https://public.getcollectr.com/public-assets/products/product_10030009.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'PIKACHU|001': 'https://public.getcollectr.com/public-assets/products/product_10009523.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'MEW EX|205': 'https://public.getcollectr.com/public-assets/products/product_10012128.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'DETECTIVE PIKACHU|098': 'https://public.getcollectr.com/public-assets/products/product_10012662.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'SYLVEON EX|212': 'https://public.getcollectr.com/public-assets/products/product_10023355.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'SNORLAX|076': 'https://public.getcollectr.com/public-assets/products/product_10004913.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'SNORLAX|181': 'https://public.getcollectr.com/public-assets/products/product_10012104.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'PIKACHU|208': 'https://public.getcollectr.com/public-assets/products/product_250510.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'SNORLAX|143': 'https://public.getcollectr.com/public-assets/products/product_10026716.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'UMBREON EX|217': 'https://public.getcollectr.com/public-assets/products/product_10023360.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'PONCHO-WEARING PIKACHU|203': 'https://public.getcollectr.com/public-assets/products/product_10010048.webp?optimizer=image&format=webp&width=400&quality=80&strip=metadata',
+  'PIKACHU|242': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png',
+  'PIKACHU|003': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png',
+  'MISCHIEVOUS PICHU|214': 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/172.png'
+};
+/* image error fallback helper */
+function _onImgErr(el, fb) {
+  if (fb && el.src !== fb) { el.src = fb; }
+  else { el.style.display='none';
+    var w = el.closest ? el.closest('.ct-wrap') : el.parentElement;
+    if (w) w.innerHTML = '<span class="ct-ph">&#x1F0CF;</span>'; }
+}
+function _imgUrl(c) {
+  if (c.image_url && c.image_url.startsWith('/')) return c.image_url;
+  return _CARD_IMG[(c.subject||'')+'|'+(c.card_number||'')] || null;
+}
+function cardThumb(c, size) {
+  var sz  = size ? 'ct-'+size : '';
+  var url = _imgUrl(c);
+  var PSA_CERTS = {'PIKACHU|242':'136143757','PIKACHU|003':'133726675','MISCHIEVOUS PICHU|214':'124559934'};
+  var ck  = (c.subject||'')+'|'+(c.card_number||'');
+  var cid = PSA_CERTS[ck];
+  var tgt = c.collectr_url || (cid ? 'https://www.psacard.com/cert/'+cid : '#');
+  var tip = c.collectr_url ? c.subject+' — open Collectr' : cid ? c.subject+' — verify on PSA' : c.subject;
+  var PIDS = {'SLOWPOKE':'79','PSYDUCK':'54','CHARIZARD EX':'6','MAGIKARP':'129',
+    'FULL ART/PIKACHU':'25','PIKACHU':'25','MEW EX':'151','DETECTIVE PIKACHU':'25',
+    'SYLVEON EX':'700','SNORLAX':'143','UMBREON EX':'197',
+    'PONCHO-WEARING PIKACHU':'25','MISCHIEVOUS PICHU':'172'};
+  var pid = PIDS[c.subject||''];
+  var fb  = pid ? 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/'+pid+'.png' : '';
+  var err = '_onImgErr(this,\'' + fb + '\')';
+  if (url) {
+    return '<span class="ct-wrap '+sz+'"><img class="ct-img" src="'+url+'" alt="'+c.subject+'" loading="lazy" title="'+tip+'" onerror="'+err+'" onclick="window.open(\'' + tgt + '\',\'_blank\')"></span>';
+  }
+  return '<span class="ct-wrap '+sz+'"><span class="ct-ph">&#x1F0CF;</span></span>';
+}
+function cardName(c, showVar) {
+  const sub = showVar && c.variety ? `<br><span style="color:var(--muted);font-size:10px">${c.variety}</span>` : '';
+  return `<div class="ct-wrap"><span class="ct-sm">${cardThumb(c)}</span><div class="ct-info"><b>${c.subject}</b>${sub}</div></div>`;
+}
+
+/* ── Helpers ──────────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('en-US', {maximumFractionDigits: 0});
+const fmtPct = n => n == null ? '—' : (n >= 0 ? '+' : '') + Number(n).toFixed(1) + '%';
+const pnlClass = n => n == null ? 'num-neu' : (n > 0 ? 'num-pos' : (n < 0 ? 'num-neg' : 'num-neu'));
+
+function badge(signal, color) {
+  const textLabel = {
+    'BUY': '✓ BUY',
+    'SELL': '✗ SELL',
+    'HOLD': '= HOLD',
+    'REVIEW': '? REVIEW'
+  }[signal] || signal;
+  return `<span class="badge" style="background:${color}" title="${signal}">${textLabel}</span>`;
+}
+function toast(msg, isErr = false) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+}
+
+/* ── Tab keyboard navigation (arrow keys) ──────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  const tabs = document.querySelectorAll('.nav-tab');
+  if (tabs.length === 0) return;
+
+  // Set up keyboard listeners for arrow keys to navigate tabs
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('keydown', (e) => {
+      let targetIndex = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        targetIndex = (index + 1) % tabs.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        targetIndex = (index - 1 + tabs.length) % tabs.length;
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        targetIndex = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        targetIndex = tabs.length - 1;
+      }
+
+      if (targetIndex >= 0) {
+        const targetTab = tabs[targetIndex];
+        switchTab(targetTab.dataset.tab);
+        targetTab.focus();
+      }
+    });
+
+    // Make tabs clickable with proper role
+    tab.addEventListener('click', () => {
+      switchTab(tab.dataset.tab);
+    });
+  });
+});
+
+/* ── Add Card functionality ──────────────────────────────────────────────── */
+let _addCardPreview = null;  // Store the current preview
+
+function switchTab(tabName) {
+  // Update nav-tabs with proper ARIA attributes
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    const isActive = t.dataset.tab === tabName;
+    t.classList.toggle('active', isActive);
+    t.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    t.setAttribute('tabindex', isActive ? '0' : '-1');
+  });
+  // Update tab-panel visibility
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    const isActive = p.id === 'tab-' + tabName;
+    p.classList.toggle('active', isActive);
+    if (isActive) p.setAttribute('role', 'tabpanel');
+  });
+}
+
+/* ── Live search for Add Card ──────────────────────────────────────────────── */
+const $q = document.getElementById('add-card-query');
+const $results = document.getElementById('search-results');
+const $state = document.getElementById('search-state');
+const $emptyHint = document.getElementById('search-empty-hint');
+const $gradeFilter = document.getElementById('grade-filter');
+const CERT_RE = /^\d{6,10}$/;
+let searchAbort = null;
+let searchTimer = null;
+let highlightedIndex = -1;
+let _lastRawResults = [];        // cache last raw results so grade changes re-render instantly
+let _lastQuery = '';             // last query string, used to rebuild external shop links
+
+function getSelectedGrade() {
+  return $gradeFilter ? parseInt($gradeFilter.value, 10) : 10;
+}
+
+if ($gradeFilter) {
+  $gradeFilter.addEventListener('change', () => {
+    // Re-render with cached results + new grade; also rebuild external shop deep-links
+    if (_lastRawResults.length || _lastQuery) renderResults(_lastRawResults);
+  });
+}
+
+if ($q) {
+  $q.addEventListener('input', e => {
+    const q = e.target.value.trim();
+    _lastQuery = q;
+    clearTimeout(searchTimer);
+    if (searchAbort) searchAbort.abort();
+    highlightedIndex = -1;
+
+    // Cert fast-path
+    if (CERT_RE.test(q)) {
+      $state.innerHTML = '<span class="chip-mini">Cert detected → direct lookup</span>';
+      $results.style.display = 'none';
+      $emptyHint.style.display = 'none';
+      searchTimer = setTimeout(() => triggerCertLookup(q), 400);
+      return;
+    }
+
+    $state.innerHTML = '';
+    if (q.length < 3) {
+      $results.style.display = 'none';
+      $emptyHint.style.display = 'block';
+      $emptyHint.textContent = 'Type 3+ characters to search — external shops shown first';
+      return;
+    }
+
+    // Block single generic terms — they explode the result set
+    const GENERIC = new Set(['pokemon','pokémon','psa','japanese','japan','card','cards','holo','rare','art','full','gold','silver','promo']);
+    const tokens = q.toLowerCase().replace(/[^\w\s]/g,' ').split(/\s+/).filter(Boolean);
+    if (tokens.length && tokens.every(t => GENERIC.has(t))) {
+      $results.style.display = 'none';
+      $emptyHint.style.display = 'block';
+      $emptyHint.textContent = 'Too broad — add a card name, number, or set (e.g. "slowpoke 082")';
+      return;
+    }
+
+    $emptyHint.style.display = 'none';
+    // Debounced live search (600ms — server is heavy)
+    searchTimer = setTimeout(() => runLiveSearch(q), 600);
+  });
+
+  $q.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      $q.value = '';
+      $results.style.display = 'none';
+      $state.innerHTML = '';
+      $emptyHint.style.display = 'block';
+      highlightedIndex = -1;
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const cards = $results.querySelectorAll('.result-card');
+      highlightedIndex = Math.min(highlightedIndex + 1, cards.length - 1);
+      updateHighlight(cards);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightedIndex = Math.max(highlightedIndex - 1, -1);
+      const cards = $results.querySelectorAll('.result-card');
+      updateHighlight(cards);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const cards = $results.querySelectorAll('.result-card');
+      if (highlightedIndex >= 0 && highlightedIndex < cards.length) {
+        cards[highlightedIndex].click();
+      } else if (cards.length > 0) {
+        cards[0].click();
+      }
+    }
+  });
+}
+
+function updateHighlight(cards) {
+  cards.forEach((card, i) => {
+    if (i === highlightedIndex) {
+      card.style.background = '#f0f2f7';
+    } else {
+      card.style.background = '';
+    }
+  });
+}
+
+async function runLiveSearch(query) {
+  searchAbort = new AbortController();
+  $state.innerHTML = '<span class="spinner-mini"></span> Searching…';
+  // After 1.5s, soften the message so user knows it's not stuck
+  const slowMsg = setTimeout(() => {
+    $state.innerHTML = '<span class="spinner-mini"></span> Still searching (eBay + Collectr + Google Shops)…';
+  }, 1500);
+  try {
+    const r = await fetch('/api/add-card/live-search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query}),
+      signal: searchAbort.signal
+    });
+    clearTimeout(slowMsg);
+    const data = await r.json();
+    const ms = data.took_ms || 0;
+    $state.innerHTML = ms > 1000 ? `<span class="chip-mini">${(ms/1000).toFixed(1)}s</span>` : '';
+    _lastRawResults = data.results || [];
+    renderResults(_lastRawResults);
+  } catch (err) {
+    clearTimeout(slowMsg);
+    if (err.name !== 'AbortError') {
+      $state.innerHTML = '<span class="err-chip">Search failed — try again</span>';
+    } else {
+      $state.innerHTML = '';
+    }
+  }
+}
+
+/* External shop deep-link builder
+ * Builds a "jump to external search" card for each major marketplace.
+ * These are prioritized ABOVE local database results. */
+function buildExternalShops(query, grade) {
+  const gradeLabel = `PSA ${grade}`;
+  const q = `${query} ${gradeLabel} Pokemon`;
+  const qEnc = encodeURIComponent(q);
+  const qEncJP = encodeURIComponent(`${query} ポケモン PSA${grade}`);
+  return [
+    { name: 'Google Shopping', tagline: `"${query}" · ${gradeLabel} · live web prices`,
+      url: `https://www.google.com/search?tbm=shop&q=${qEnc}`,
+      logo: 'G', color: '#4285F4' },
+    { name: 'eBay (Sold + Active)', tagline: `Global comps & auctions · ${gradeLabel}`,
+      url: `https://www.ebay.com/sch/i.html?_nkw=${qEnc}&_sop=13`,
+      logo: 'e', color: '#E53238' },
+    { name: 'TCGPlayer', tagline: `Market prices & dealer listings · ${gradeLabel}`,
+      url: `https://www.tcgplayer.com/search/pokemon/product?q=${qEnc}&view=grid`,
+      logo: 'T', color: '#F28800' },
+    { name: 'Mercari (JP + US)', tagline: `Japan secondary market · ${gradeLabel}`,
+      url: `https://www.mercari.com/search/?keyword=${qEnc}`,
+      logo: 'M', color: '#FF0211' },
+    { name: 'Yahoo! Auctions JP', tagline: `Japanese auctions · ${gradeLabel}`,
+      url: `https://auctions.yahoo.co.jp/search/search?p=${qEncJP}`,
+      logo: 'Y', color: '#7B0099' },
+    { name: 'PSA Cert Marketplace', tagline: `Certified listings · ${gradeLabel}`,
+      url: `https://www.psacard.com/auctionprices/pokemon-cards?search=${qEnc}`,
+      logo: 'P', color: '#D32030' },
+  ];
+}
+
+function extCardHTML(shop) {
+  const initials = (shop.logo || shop.name.slice(0,1)).toUpperCase();
+  return `<a class="ext-card" href="${shop.url}" target="_blank" rel="noopener noreferrer">
+    <div class="ext-logo" style="background:${shop.color}">${initials}</div>
+    <div class="ext-body">
+      <div class="ext-name">${shop.name}</div>
+      <div class="ext-sub">${shop.tagline}</div>
+    </div>
+    <div class="ext-arrow">↗</div>
+  </a>`;
+}
+
+function renderResults(results) {
+  const grade = getSelectedGrade();
+  const query = _lastQuery || ($q ? $q.value.trim() : '');
+
+  // Partition local results: matches for the selected grade only
+  const matches = [];
+  (results || []).forEach(r => {
+    const g = parseInt(r.grade, 10);
+    if (g === grade) matches.push(r);
+  });
+
+  // Build external shop cards — always shown first, even if local is empty
+  const shops = buildExternalShops(query || 'pokemon', grade);
+  const extHTML = shops.map(extCardHTML).join('');
+
+  const matchesBody = matches.length
+    ? matches.map(resultCardHTML).join('')
+    : `<div class="grade-col-empty">
+         No PSA ${grade} matches in local database.<br>
+         <span style="font-size:10px">Try the external shops ↖ or change grade above.</span>
+       </div>`;
+
+  $results.innerHTML = `<div class="search-grid">
+    <div class="grade-col ext-col">
+      <div class="grade-col-hdr">🌐 External Shops — live web search<span class="count">${shops.length}</span></div>
+      ${extHTML}
+    </div>
+    <div class="grade-col">
+      <div class="grade-col-hdr">PSA ${grade} · Direct matches<span class="count">${matches.length}</span></div>
+      ${matchesBody}
+    </div>
+  </div>`;
+  $results.style.display = 'block';
+  $results.querySelectorAll('.result-card').forEach(el => {
+    el.addEventListener('click', () => pickCandidate(el.dataset));
+  });
+  highlightedIndex = -1;
+}
+
+function resultCardHTML(r) {
+  const tags = [];
+  if (r.source.includes('collectr')) tags.push('<span class="tag tag-collectr">Collectr</span>');
+  if (r.ebay_n_comps) tags.push(`<span class="tag tag-ebay">eBay n=${r.ebay_n_comps}</span>`);
+  if (r.owned) tags.push(`<span class="tag tag-owned">✓ Owned (${r.owned_count})</span>`);
+
+  const price = r.price_thb ? `฿${fmt(r.price_thb)}` : 'Price unknown';
+  const thumb = r.thumbnail_url ? `<img src="${r.thumbnail_url}" class="result-thumb" onerror="this.style.display='none'">` : '';
+
+  return `<div class="result-card" data-product-id="${r.product_id || ''}" data-url="${r.url || ''}"
+         data-title="${escapeHtml(r.title)}" data-subject="${r.subject || ''}" data-card-number="${r.card_number || ''}"
+         data-grade="${r.grade || ''}">
+    ${thumb}
+    <div class="result-body">
+      <div class="result-title">${r.subject || '?'} · ${r.variety || 'Unknown'}</div>
+      <div class="result-meta">${r.year || '?'} · ${r.set || '?'} · #${r.card_number || '?'} · PSA ${r.grade || '?'}</div>
+      <div class="result-tags">${tags.join('')}</div>
+    </div>
+    <div class="result-price">
+      <div class="price-val">${price}</div>
+      <div class="price-src">${r.source}</div>
+    </div>
+  </div>`;
+}
+
+function escapeHtml(text) {
+  return (text || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+function pickCandidate(dataset) {
+  // Hand off to existing 3-source merge flow
+  const {productId, url, title} = dataset;
+  startPreviewFetch({product_id: productId, url, title});
+}
+
+function triggerCertLookup(cert) {
+  // Trigger existing cert flow
+  const input = $('add-card-query');
+  input.value = cert;
+  doAddCardSearch();
+}
+
+function startPreviewFetch(candidateData) {
+  // Handle clicking a search result candidate or cert lookup
+  const productId = candidateData.product_id;
+  const url = candidateData.url;
+  const title = candidateData.title;
+
+  // Switch to searching state
+  $('add-card-empty').style.display = 'none';
+  $('add-card-searching').style.display = 'block';
+  $('add-card-preview').style.display = 'none';
+  $('add-card-saved').style.display = 'none';
+
+  $('add-card-cert-display').textContent = productId || 'Searching…';
+  // Reset chips
+  ['psa', 'collectr', 'ebay'].forEach(src => {
+    const chip = $(`add-card-chip-${src}`);
+    chip.className = 'add-card-chip pending';
+    chip.querySelector('.add-card-chip-icon').textContent = '…';
+    chip.querySelector('.add-card-status').textContent = 'Fetching…';
+  });
+
+  // Fetch card by candidate
+  fetch('/api/add-card/search-by-candidate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({product_id: productId, url, title})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status !== 'ok') throw new Error(data.message);
+    _addCardPreview = data.preview;
+
+    // Update chips (no errors expected for candidate flow)
+    ['psa', 'collectr', 'ebay'].forEach(src => {
+      const chip = $(`add-card-chip-${src}`);
+      const error = data.preview.errors[src];
+      if (error) {
+        chip.className = 'add-card-chip error';
+        chip.querySelector('.add-card-chip-icon').textContent = '✕';
+        chip.querySelector('.add-card-status').textContent = error.slice(0, 30);
+      } else {
+        chip.className = 'add-card-chip done';
+        chip.querySelector('.add-card-chip-icon').textContent = '✓';
+        if (src === 'psa') {
+          chip.querySelector('.add-card-status').textContent = `Found · PSA ${data.preview.grade}`;
+        } else if (src === 'collectr') {
+          chip.querySelector('.add-card-status').textContent = data.preview.collectr_price_thb ? `฿${fmt(data.preview.collectr_price_thb)}` : 'No listing';
+        } else if (src === 'ebay') {
+          chip.querySelector('.add-card-status').textContent = data.preview.ebay_n_comps > 0 ? `${data.preview.ebay_n_comps} listings` : 'No listings';
+        }
+      }
+    });
+
+    // Populate preview and show it
+    showAddCardPreview(data.preview);
+  })
+  .catch(err => {
+    toast('❌ Failed to fetch candidate: ' + err.message, true);
+    $('add-card-searching').style.display = 'none';
+    $('add-card-empty').style.display = 'block';
+  });
+}
+
+function doAddCardSearch() {
+  const cert = $('add-card-query').value.trim();
+  if (!cert || !/^\d{6,10}$/.test(cert)) {
+    toast('Cert must be 6-10 digits', true);
+    return;
+  }
+
+  // Switch to searching state
+  $('add-card-empty').style.display = 'none';
+  $('add-card-searching').style.display = 'block';
+  $('add-card-preview').style.display = 'none';
+  $('add-card-saved').style.display = 'none';
+
+  $('add-card-cert-display').textContent = cert;
+  // Reset chips
+  ['psa', 'collectr', 'ebay'].forEach(src => {
+    const chip = $(`add-card-chip-${src}`);
+    chip.className = 'add-card-chip pending';
+    chip.querySelector('.add-card-chip-icon').textContent = '…';
+    chip.querySelector('.add-card-status').textContent = 'Fetching…';
+  });
+
+  // Fetch card
+  fetch('/api/add-card/search', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({cert})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status !== 'ok') throw new Error(data.message);
+    _addCardPreview = data.preview;
+
+    // Update chips
+    ['psa', 'collectr', 'ebay'].forEach(src => {
+      const chip = $(`add-card-chip-${src}`);
+      const error = data.preview.errors[src];
+      if (error) {
+        chip.className = 'add-card-chip error';
+        chip.querySelector('.add-card-chip-icon').textContent = '✕';
+        chip.querySelector('.add-card-status').textContent = error.slice(0, 30);
+      } else {
+        chip.className = 'add-card-chip done';
+        chip.querySelector('.add-card-chip-icon').textContent = '✓';
+        if (src === 'psa') {
+          chip.querySelector('.add-card-status').textContent = `Found · PSA ${data.preview.grade}`;
+        } else if (src === 'collectr') {
+          chip.querySelector('.add-card-status').textContent = data.preview.collectr_price_thb ? `฿${fmt(data.preview.collectr_price_thb)}` : 'No listing';
+        } else {
+          chip.querySelector('.add-card-status').textContent = `${data.preview.ebay_n_comps} comps`;
+        }
+      }
+    });
+
+    // Render preview
+    showAddCardPreview(data.preview);
+  })
+  .catch(e => {
+    toast('❌ Search failed: ' + e.message, true);
+    $('add-card-searching').style.display = 'none';
+    $('add-card-empty').style.display = 'block';
+  });
+}
+
+function showAddCardPreview(preview) {
+  // Populate preview panel
+  $('add-card-subject-display').textContent = preview.subject + (preview.variety ? ' · ' + preview.variety : '');
+  $('add-card-sub-display').textContent = `${preview.year} ${preview.set_name} · Card #${preview.card_number}`;
+
+  // Pills
+  const pills = `
+    <span class="add-card-pill add-card-pill-grade">PSA ${preview.grade}</span>
+    ${preview.variety ? `<span class="add-card-pill add-card-pill-variety">${preview.variety}</span>` : ''}
+    <span class="add-card-pill">Cert ${preview.cert}</span>
+  `;
+  $('add-card-pills').innerHTML = pills;
+
+  // Prices
+  $('add-card-collectr-price').textContent = preview.collectr_price_thb ? '฿' + fmt(preview.collectr_price_thb) : '—';
+  $('add-card-collectr-tag').textContent = preview.collectr_url ? '✓ matched' : '—';
+  $('add-card-psa-estimate').textContent = preview.psa_estimate_thb ? '฿' + fmt(preview.psa_estimate_thb) : '—';
+  $('add-card-ebay-price').textContent = preview.ebay_avg_thb ? '฿' + fmt(preview.ebay_avg_thb) : '—';
+  $('add-card-ebay-tag').textContent = `n=${preview.ebay_n_comps}`;
+
+  // Signal
+  const sigBox = $('add-card-signal-box');
+  const sigChip = $('add-card-signal-chip');
+  sigChip.textContent = preview.signal;
+  sigChip.style.background = {'BUY':'#4CAF50','HOLD':'#2196F3','SELL':'#F44336','REVIEW':'#FF9800'}[preview.signal] || '#999';
+  $('add-card-signal-text').innerHTML =
+    preview.signal === 'REVIEW'
+    ? `<strong>Fill in my cost</strong><br>${preview.confidence.toFixed(0)}% confidence · ${preview.ebay_n_comps} eBay comps`
+    : `<strong>${preview.risk_level} risk · ${preview.upside_pct > 0 ? '+' : ''}${preview.upside_pct.toFixed(1)}% upside</strong><br>Confidence ${preview.confidence.toFixed(0)}%`;
+
+  // Date
+  const today = new Date().toISOString().split('T')[0];
+  $('add-card-date-acquired').value = today;
+
+  // Images
+  if (preview.psa_image_ok) {
+    $('add-card-psa-img').innerHTML = `<img src="/psa-img/${preview.cert}" style="width:100%;height:100%;object-fit:cover">`;
+  }
+  if (preview.collectr_url && preview.collectr_image_ok) {
+    const pid = preview.collectr_url.split('/').pop();
+    $('add-card-collectr-img').innerHTML = `<img src="/card-img/${pid}" style="width:100%;height:100%;object-fit:cover">`;
+  }
+
+  if (preview.image_match_ok) {
+    $('add-card-match-badge').style.display = 'block';
+  } else {
+    $('add-card-match-badge').style.display = 'none';
+  }
+
+  // Show preview, hide searching
+  $('add-card-searching').style.display = 'none';
+  $('add-card-preview').style.display = 'block';
+}
+
+function doAddCardEdit() {
+  // Fields are already editable, just show a toast
+  toast('📝 Edit the fields above and click Approve to save');
+}
+
+function doAddCardCancel() {
+  doAddCardReset();
+}
+
+function doAddCardReset() {
+  _addCardPreview = null;
+  // Clear query input (new live search) or cert input (legacy)
+  if ($('add-card-query')) {
+    $('add-card-query').value = '';
+    $('add-card-query').focus();
+  }
+  if ($('add-card-cert')) {
+    $('add-card-cert').value = '';
+  }
+  $('add-card-empty').style.display = 'block';
+  $('add-card-searching').style.display = 'none';
+  $('add-card-preview').style.display = 'none';
+  $('add-card-saved').style.display = 'none';
+  // Clear search results
+  if ($results) $results.style.display = 'none';
+  if ($state) $state.innerHTML = '';
+  if ($emptyHint) $emptyHint.style.display = 'block';
+}
+
+function doAddCardApprove() {
+  if (!_addCardPreview) {
+    toast('❌ No card loaded', true);
+    return;
+  }
+
+  const my_cost = parseFloat($('add-card-my-cost').value) || null;
+  const date_acquired = $('add-card-date-acquired').value;
+  const source = $('add-card-source').value || '';
+  const notes = $('add-card-notes').value || '';
+  const item_status = $('add-card-item-status').value || 'Active';
+
+  fetch('/api/add-card/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      preview: _addCardPreview,
+      my_info: {my_cost, date_acquired, source, notes, item_status}
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.status !== 'ok') throw new Error(data.message);
+
+    // Show saved state
+    $('add-card-saved-title').textContent = `Cert ${_addCardPreview.cert} saved to master`;
+    $('add-card-searching').style.display = 'none';
+    $('add-card-preview').style.display = 'none';
+    $('add-card-empty').style.display = 'none';
+    $('add-card-saved').style.display = 'block';
+
+    toast('✅ Card saved to Portfolio_Master.xlsx');
+
+    // Reset after 4 seconds
+    setTimeout(() => {
+      doAddCardReset();
+      // Refresh dashboard
+      doRefresh();
+    }, 4000);
+  })
+  .catch(e => {
+    toast('❌ Save failed: ' + e.message, true);
+  });
+}
+
+// Keyboard shortcut: 'n' to jump to Add Card
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'n' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    switchTab('add-card');
+    $('add-card-cert').focus();
+  }
+});
+
+// Enter key in cert input
+document.addEventListener('DOMContentLoaded', () => {
+  const certInput = $('add-card-cert');
+  if (certInput) {
+    certInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doAddCardSearch();
+    });
+  }
+});
+
+/* ── Tab navigation ───────────────────────────────────────────────────── */
+// Route clicks through window.switchTab so the P&L-tab hook (which wraps
+// switchTab later in the file) gets a chance to init pnlApp on first visit.
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    if (typeof window.switchTab === 'function') {
+      window.switchTab(tab.dataset.tab);
+    } else {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      $('tab-' + tab.dataset.tab).classList.add('active');
+    }
+  });
+});
+
+/* ── Refresh ──────────────────────────────────────────────────────────── */
+const STEPS = [
+  [0,    'Launching Playwright browser…'],
+  [3000, 'Fetching live prices (1/3)…'],
+  [8000, 'Fetching live prices (2/3)…'],
+  [13000,'Fetching live prices (3/3)…'],
+  [17000,'Building portfolio signals…'],
+  [20000,'Calculating P&L…'],
+];
+
+function setStep(text) {
+  $('step-text').textContent = text;
+}
+
+function startStepCycle() {
+  const status = $('refresh-status');
+  status.classList.add('visible');
+  setStep(STEPS[0][1]);
+
+  // Show loading skeletons in all tables
+  showLoadingSkeletons();
+
+  const timers = STEPS.slice(1).map(([ms, txt]) =>
+    setTimeout(() => setStep(txt), ms)
+  );
+  return timers;
+}
+
+function showLoadingSkeletons() {
+  // Show skeletons in Portfolio table
+  const portfolioBody = $('portfolio-body');
+  if (portfolioBody) {
+    portfolioBody.innerHTML = Array(5).fill(0).map((_, i) =>
+      `<tr key="skeleton-${i}"><td colspan="12"><div class="skeleton skeleton-row"></div></td></tr>`
+    ).join('');
+  }
+
+  // Show skeletons in Market table
+  const mktBody = $('mkt-body');
+  if (mktBody) {
+    mktBody.innerHTML = Array(5).fill(0).map((_, i) =>
+      `<tr key="skeleton-${i}"><td colspan="11"><div class="skeleton skeleton-row"></div></td></tr>`
+    ).join('');
+  }
+
+  // Show skeletons in Collectr table
+  const collectrBody = $('collectr-body');
+  if (collectrBody) {
+    collectrBody.innerHTML = Array(3).fill(0).map((_, i) =>
+      `<tr key="skeleton-${i}"><td colspan="8"><div class="skeleton skeleton-row"></div></td></tr>`
+    ).join('');
+  }
+}
+
+function stopStepCycle(timers) {
+  timers.forEach(clearTimeout);
+  $('refresh-status').classList.remove('visible');
+}
+
+async function doRefresh() {
+  const btn = $('btn-refresh');
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  const timers = startStepCycle();
+
+  try {
+    const res = await fetch('/api/refresh', { method: 'POST' });
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const data = await res.json();
+    if (data.status === 'error') throw new Error(data.message);
+    stopStepCycle(timers);
+    renderAll(data);
+    fetchAISummary(data);
+    toast('✅ Portfolio refreshed — ' + data.ts_display);
+    // Clear any error states when refresh succeeds
+    document.querySelectorAll('.state-banner.error').forEach(el => el.style.display = 'none');
+  } catch (e) {
+    stopStepCycle(timers);
+    const errorMsg = e.message || 'Network error or server timeout';
+    toast('❌ Refresh failed: ' + errorMsg, true);
+    showErrorState(errorMsg);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+function showErrorState(errorMsg) {
+  const emptyStates = document.querySelectorAll('[id$="-empty"]');
+  emptyStates.forEach(state => {
+    if (state.style.display !== 'none') {
+      const errorBanner = document.createElement('div');
+      errorBanner.className = 'state-banner error';
+      errorBanner.innerHTML = `
+        <h3>Connection failed</h3>
+        <p>${errorMsg}</p>
+        <div class="error-action">
+          <button class="btn-retry" onclick="doRefresh()">🔄 Retry</button>
+        </div>
+      `;
+      state.parentNode.insertBefore(errorBanner, state);
+      state.style.display = 'none';
+    }
+  });
+}
+
+/* ── Load cached data on open ─────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    if (data.status === 'success') renderAll(data);
+  } catch (_) {}
+});
+
+/* ── Render all tabs ──────────────────────────────────────────────────── */
+function renderAll(data) {
+  $('ts-display').textContent = data.ts_display || '—';
+  const srcBadge = $('src-badge');
+  if (srcBadge) {
+    const isLive = data.data_source === 'live';
+    srcBadge.textContent = isLive ? '🟢 LIVE' : '🟡 SNAPSHOT';
+    srcBadge.style.color = isLive ? '#4CAF50' : '#FF9800';
+  }
+  renderDashboard(data);
+  renderPortfolio(data.portfolio || []);
+  renderCollectr(data.portfolio || []);
+  renderInsights(data.insights || {});
+  renderExceptions(data.exceptions || []);
+}
+
+/* ── Chart instances (────────────────────────────────────────────) */
+const _charts = {};
+function _dc(id) { if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; } }
+const SIG_C  = { BUY:'#4CAF50', HOLD:'#2196F3', SELL:'#F44336', REVIEW:'#FF9800' };
+const RISK_C = { LOW:'#4CAF50', MEDIUM:'#FF9800', HIGH:'#F44336' };
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+  Chart.defaults.font.size   = 11;
+  Chart.defaults.color       = '#6B7694';
+}
+
+/* ── Dashboard render ──────────────────────────────────────────────────── */
+function renderDashboard(data) {
+  const s     = data.summary || {};
+  const cards = data.portfolio || [];
+  const pnl   = s.total_pnl || 0;
+  const pnlP  = s.pnl_pct   || 0;
+  const sortedP = [...cards].filter(c=>c.pnl_pct!=null).sort((a,b)=>b.pnl_pct-a.pnl_pct);
+  const best  = sortedP[0]  || {};
+  const worst = sortedP[sortedP.length-1] || {};
+  const buyN  = (s.signal_distribution||{}).BUY  || 0;
+  const sellN = (s.signal_distribution||{}).SELL || 0;
+  const avgC  = cards.length ? Math.round(cards.reduce((a,c)=>a+(c.confidence||0),0)/cards.length) : 0;
+
+  // KPI
+  const kpis = [
+    { lbl:'Cards',           val:s.card_count||0,              sub:'PSA graded',          cls:'',      xc:'' },
+    { lbl:'Total Cost',      val:'฿'+fmt(s.total_cost),   sub:'Purchase basis',       cls:'',      xc:'' },
+    { lbl:'Market Value',    val:'฿'+fmt(s.total_market_value), sub:'Collectr live', cls:'',      xc:'' },
+    { lbl:'Total P&L',       val:'฿'+fmt(pnl),            sub:fmtPct(pnlP)+' return',cls:pnl>=0?'pos':'neg', xc:'kpi-'+(pnl>=0?'pnl-pos':'pnl-neg') },
+    { lbl:'Best Card',       val:best.subject||'—',        sub:fmtPct(best.pnl_pct),  cls:'pos',   xc:'kpi-buy' },
+    { lbl:'Watch Card',      val:worst.subject||'—',       sub:fmtPct(worst.pnl_pct), cls:worst.pnl_pct<0?'neg':'', xc:worst.pnl_pct<0?'kpi-sell':'' },
+    { lbl:'Avg Confidence',  val:avgC+'%',                      sub:buyN+' BUY · '+sellN+' SELL', cls:'', xc:'' },
+  ];
+  $('kpi-grid').innerHTML = kpis.map(k=>
+    `<div class="kpi-card ${k.xc}">
+       <div class="kpi-label">${k.lbl}</div>
+       <div class="kpi-val ${k.cls}" style="font-size:${(k.lbl==='Best Card'||k.lbl==='Watch Card')?'13px':'22px'};line-height:1.2">${k.val}</div>
+       <div class="kpi-sub">${k.sub}</div>
+     </div>`
+  ).join('');
+
+  _pnlChart(cards);
+  _outperformers(cards);
+  _costMVChart(cards);
+  _signalDonut(s);
+  _riskDonut(s);
+  _gradeChart(cards);
+  _signalIntel(cards);
+  _mktTable(cards);
+
+  $('dashboard-empty').style.display   = 'none';
+  $('dashboard-content').style.display = 'block';
+}
+
+/* P&L horizontal bar */
+function _pnlChart(cards) {
+  _dc('pnl');
+  const s = [...cards].filter(c=>c.pnl_pct!=null).sort((a,b)=>a.pnl_pct-b.pnl_pct);
+  const ctx = document.getElementById('chart-pnl').getContext('2d');
+  _charts['pnl'] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels: s.map(c=>`${c.subject} PSA${c.grade}`), datasets:[{
+      data: s.map(c=>parseFloat(c.pnl_pct.toFixed(1))),
+      backgroundColor: s.map(c=>c.pnl_pct>=0?'rgba(76,175,80,.80)':'rgba(244,67,54,.80)'),
+      borderColor:     s.map(c=>c.pnl_pct>=0?'#388E3C':'#C62828'),
+      borderWidth:1, borderRadius:3,
+    }]},
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label: ci=>{
+          const c=s[ci.dataIndex];
+          return [` P&L: ${fmtPct(c.pnl_pct)}  (฿${fmt(c.pnl)})`,` Signal: ${c.signal}  Risk: ${c.risk_level}`,` ${c.explanation||''}`];
+        }}}
+      },
+      scales:{
+        x:{ grid:{color:'rgba(0,0,0,.05)'}, ticks:{callback:v=>v+'%'} },
+        y:{ grid:{display:false}, ticks:{font:{size:10}} }
+      }
+    }
+  });
+}
+
+/* Market Outperformers — Top 10 vs multi-source fair value
+   Sources supported (rendered "live" when populated, muted otherwise):
+     • Collectr live price               (c.collectr_price)
+     • PSA price-guide estimate          (c.psa_estimate)
+     • eBay sold comps (avg, THB)        (c.ebay_avg_thb)
+     • PriceCharting (avg, THB)          (c.pricecharting_thb)
+     • SNKR / other APIs                 (c.snkr_thb)
+   Ranks cards by P&L% against the best-of-consensus fair value across
+   whichever sources are present — identifies cards that out-perform cost. */
+function _outperformers(cards) {
+  const list = document.getElementById('outp-list');
+  const srcBar = document.getElementById('outp-sources');
+  if (!list) return;
+
+  // Portfolio-side sources (derived from cards[])
+  const PORT_DEFS = [
+    { key:'collectr_price',     name:'Collectr',   color:'#00BCD4' },
+    { key:'psa_estimate',       name:'PSA',        color:'#FFC107' },
+  ];
+  // API-side sources (keys match backend connected[] from /api/market-outperformers)
+  const API_DEFS = [
+    { key:'ebay',        name:'eBay',       color:'#4CAF50' },
+    { key:'pricechart',  name:'PriceChart', color:'#9C27B0' },
+    { key:'snkr',        name:'SNKR',       color:'#FF5722' },
+    { key:'tcgapi',      name:'TCG API',    color:'#1976D2' },
+  ];
+  // Unified map used by row-level badges
+  const SRC_COLOR = {
+    ebay:'#4CAF50', pricechart:'#9C27B0', snkr:'#FF5722', tcgapi:'#1976D2',
+    collectr_price:'#00BCD4', psa_estimate:'#FFC107',
+  };
+  const SRC_LABEL = {
+    ebay:'eBay', pricechart:'PriceChart', snkr:'SNKR', tcgapi:'TCG',
+    collectr_price:'Collectr', psa_estimate:'PSA',
+  };
+
+  // Format a merged-row price: prefer USD max; show native chip if non-USD.
+  const fmtMergedPrice = (r) => {
+    if (r.prices) {
+      const order = ['tcgapi','ebay','pricechart','snkr'];
+      for (const k of order) {
+        const p = r.prices[k];
+        if (p && typeof p.price === 'number' && p.price > 0) {
+          const sym = {USD:'$',EUR:'€',JPY:'¥',THB:'฿'}[p.ccy] || '';
+          return `${sym}${Number(p.price).toLocaleString(undefined,{maximumFractionDigits:2})}`;
+        }
+      }
+    }
+    return r.price_usd_max ? `$${Number(r.price_usd_max).toFixed(2)}` : '—';
+  };
+
+  // Global market rank — merged from pokemontcg.io + SNKR + PriceCharting + eBay.
+  // Falls back to portfolio-based ranking only if every API source fails.
+  list.innerHTML = `<div class="outp-empty">Loading global top 10 from Pokémon TCG market…</div>`;
+
+  fetch('/api/market-outperformers').then(r => r.json()).then(data => {
+    const connected = new Set((data && data.connected) || []);
+    // Build chip bar: portfolio sources (from cards) + API sources (from connected[])
+    if (srcBar) {
+      const portChips = PORT_DEFS.map(s => {
+        const live = cards.some(c => typeof c[s.key] === 'number' && c[s.key] > 0);
+        return `<span class="outp-src-chip ${live?'live':''}" title="${live?'live data':'awaiting data'}">${live?'●':'○'} ${s.name}</span>`;
+      }).join('');
+      const apiChips = API_DEFS.map(s => {
+        const live = connected.has(s.key);
+        const count = (data && data.counts && data.counts[s.key]) || 0;
+        return `<span class="outp-src-chip ${live?'live':''}" title="${live?`live · ${count} rows`:'offline or blocked'}">${live?'●':'○'} ${s.name}</span>`;
+      }).join('');
+      srcBar.innerHTML = portChips + apiChips;
+    }
+    if (data && data.status === 'success' && Array.isArray(data.rows) && data.rows.length) {
+      list.innerHTML = data.rows.map((r, i) => {
+        const price = fmtMergedPrice(r);
+        const sub = [r.set, r.rarity].filter(Boolean).join(' · ');
+        const url = (r.urls && (r.urls.tcgapi || r.urls.ebay || r.urls.pricechart || r.urls.snkr)) || null;
+        const linkOpen  = url ? `<a href="${url}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">` : '';
+        const linkClose = url ? '</a>' : '';
+        // Per-row source badges
+        const badges = (r.sources || []).map(k =>
+          `<span class="outp-src-dot" title="${SRC_LABEL[k]||k}"><span class="dot" style="background:${SRC_COLOR[k]||'#90A4AE'}"></span>${SRC_LABEL[k]||k}</span>`
+        ).join('');
+        const numTxt = r.number ? `· #${r.number}` : '';
+        // Build a pseudo-card so cardThumb() can reuse its _CARD_IMG lookup
+        // + PokéAPI fallback. Match against portfolio cards first — if the row
+        // corresponds to something the user owns, use that full card object
+        // (gets the local /card-img/* cached Collectr art with full metadata).
+        const matched = (cards || []).find(c =>
+          (c.subject||'').toUpperCase() === String(r.name||'').toUpperCase()
+          && String(c.card_number||'').padStart(3,'0') === String(r.number||'').padStart(3,'0')
+        );
+        const thumbCard = matched || {
+          subject: String(r.name||'').toUpperCase(),
+          card_number: String(r.number||''),
+          collectr_url: url
+        };
+        const thumb = cardThumb(thumbCard, 'sm');
+        return `<div class="outp-row">
+          <div class="outp-rank ${i<3?'top3':''}">${i+1}</div>
+          <div class="outp-thumb">${thumb}</div>
+          <div class="outp-info">
+            <div class="outp-name">${linkOpen}${r.name || '—'}${linkClose} <span style="color:#90A4AE;font-weight:600">${numTxt}</span></div>
+            <div class="outp-sub">${sub}${sub && badges ? ' · ' : ''}${badges}</div>
+          </div>
+          <div class="outp-perf">
+            <div class="outp-pct" style="color:#1976D2">${price}</div>
+            <div class="outp-abs">${(r.sources||[]).length>1 ? (r.sources.length+' srcs') : 'trend'}</div>
+          </div>
+        </div>`;
+      }).join('');
+      return;
+    }
+    // fall through to portfolio ranking if every API source failed
+    _outperformersPortfolioFallback(cards, list, srcBar, [...PORT_DEFS]);
+  }).catch(() => {
+    _outperformersPortfolioFallback(cards, list, srcBar, [...PORT_DEFS]);
+  });
+}
+
+function _outperformersPortfolioFallback(cards, list, srcBar, SRC_DEFS) {
+  if (srcBar) {
+    srcBar.innerHTML = SRC_DEFS.filter(s => s.key !== '__pokemontcg').map(s => {
+      const live = cards.some(c => typeof c[s.key] === 'number' && c[s.key] > 0);
+      return `<span class="outp-src-chip ${live?'live':''}" title="${live?'live data':'awaiting API'}">${live?'●':'○'} ${s.name}</span>`;
+    }).join('') + `<span class="outp-src-chip" style="background:#FFF3E0;color:#E65100">Portfolio fallback</span>`;
+  }
+  const defs = SRC_DEFS.filter(s => s.key !== '__pokemontcg');
+  const ranked = [];
+  for (const c of cards) {
+    if (!c || !c.my_cost) continue;
+    const prices = [];
+    for (const s of defs) {
+      const v = c[s.key];
+      if (typeof v === 'number' && v > 0) prices.push({ src:s, val:v });
+    }
+    if (!prices.length) continue;
+    const best = prices.reduce((a,b)=> b.val>a.val?b:a);
+    const sorted = prices.map(p=>p.val).sort((x,y)=>x-y);
+    const median = sorted.length%2 ? sorted[(sorted.length-1)/2] : (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+    const blended = (best.val*0.55) + (median*0.45);
+    const gain = blended - c.my_cost;
+    const pct  = c.my_cost>0 ? (gain/c.my_cost)*100 : 0;
+    ranked.push({ card:c, blended, gain, pct, best, sources:prices });
+  }
+  ranked.sort((a,b)=> b.pct - a.pct);
+  const top = ranked.filter(r => r.pct > 0).slice(0, 10);
+  if (!top.length) {
+    list.innerHTML = `<div class="outp-empty">Global feed unavailable and no portfolio cards currently out-performing.</div>`;
+    return;
+  }
+  list.innerHTML = top.map((r,i) => {
+    const c = r.card;
+    const dots = r.sources.map(p => `<span class="outp-src-dot" title="${p.src.name}: ฿${fmt(p.val)}"><span class="dot" style="background:${p.src.color}"></span>${p.src.name}</span>`).join('');
+    const link = c.collectr_url ? `<a href="${c.collectr_url}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">${c.subject}</a>` : c.subject;
+    const thumb = cardThumb(c, 'sm');
+    return `<div class="outp-row">
+      <div class="outp-rank ${i<3?'top3':''}">${i+1}</div>
+      <div class="outp-thumb">${thumb}</div>
+      <div class="outp-info">
+        <div class="outp-name">${link} <span style="color:#90A4AE;font-weight:600">· PSA${c.grade}</span></div>
+        <div class="outp-sub">${dots}<span style="color:#B0BEC5">· best ${r.best.src.name}: ฿${fmt(r.best.val)}</span></div>
+      </div>
+      <div class="outp-perf">
+        <div class="outp-pct">${fmtPct(r.pct)}</div>
+        <div class="outp-abs">+฿${fmt(r.gain)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* Cost vs MV grouped bar */
+function _costMVChart(cards) {
+  _dc('costmv');
+  const v = [...cards].filter(c=>c.my_cost&&c.market_value).sort((a,b)=>(b.market_value||0)-(a.market_value||0));
+  const ctx = document.getElementById('chart-costmv').getContext('2d');
+  _charts['costmv'] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels: v.map(c=>c.subject.length>13?c.subject.slice(0,13)+'…':c.subject),
+      datasets:[
+        { label:'My Cost',      data:v.map(c=>c.my_cost),      backgroundColor:'rgba(36,52,89,.75)', borderRadius:2 },
+        { label:'Market Value', data:v.map(c=>c.market_value), backgroundColor:v.map(c=>c.pnl>=0?'rgba(76,175,80,.80)':'rgba(244,67,54,.75)'), borderRadius:2 },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},padding:10}},
+        tooltip:{callbacks:{label:ci=>` ${ci.dataset.label}: ฿${fmt(ci.raw)}`}}
+      },
+      scales:{
+        x:{ ticks:{font:{size:9},maxRotation:40}, grid:{display:false} },
+        y:{ grid:{color:'rgba(0,0,0,.05)'}, ticks:{callback:v=>'฿'+fmt(v)} }
+      }
+    }
+  });
+}
+
+/* Signal donut */
+function _signalDonut(s) {
+  _dc('signal');
+  const keys=['BUY','HOLD','SELL','REVIEW'];
+  const sig=s.signal_distribution||{};
+  const vals=keys.map(k=>sig[k]||0);
+  const ctx = document.getElementById('chart-signal').getContext('2d');
+  _charts['signal'] = new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:keys,datasets:[{data:vals,backgroundColor:keys.map(k=>SIG_C[k]),borderWidth:2,borderColor:'#fff',hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ci=>` ${ci.label}: ${ci.raw}`}}}}
+  });
+  $('signal-legend').innerHTML = keys.map((k,i)=>vals[i]>0
+    ?`<span style="display:inline-flex;align-items:center;gap:3px;margin:2px 5px 2px 0">
+       <span style="width:8px;height:8px;border-radius:50%;background:${SIG_C[k]};display:inline-block;flex-shrink:0"></span>
+       ${k} <b>${vals[i]}</b></span>`:'').join('');
+}
+
+/* Risk donut */
+function _riskDonut(s) {
+  _dc('risk');
+  const keys=['LOW','MEDIUM','HIGH'];
+  const risk=s.risk_distribution||{};
+  const vals=keys.map(k=>risk[k]||0);
+  const ctx = document.getElementById('chart-risk').getContext('2d');
+  _charts['risk'] = new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:keys,datasets:[{data:vals,backgroundColor:keys.map(k=>RISK_C[k]),borderWidth:2,borderColor:'#fff',hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ci=>` ${ci.label}: ${ci.raw}`}}}}
+  });
+  $('risk-legend').innerHTML = keys.map((k,i)=>vals[i]>0
+    ?`<span style="display:inline-flex;align-items:center;gap:3px;margin:2px 5px 2px 0">
+       <span style="width:8px;height:8px;border-radius:50%;background:${RISK_C[k]};display:inline-block;flex-shrink:0"></span>
+       ${k} <b>${vals[i]}</b></span>`:'').join('');
+}
+
+/* PSA Grade Ladder */
+function _gradeChart(cards) {
+  _dc('grade');
+  const w = cards.filter(c=>c.collectr_psa10||c.collectr_psa9||c.collectr_psa8);
+  if (!w.length) {
+    const el = document.getElementById('chart-grade');
+    if (el) el.parentElement.innerHTML='<p style="color:var(--muted);font-size:12px;padding:16px 0">Grade ladder available after live Collectr refresh.</p>';
+    return;
+  }
+  const s = [...w].sort((a,b)=>(b.collectr_psa10||0)-(a.collectr_psa10||0));
+  const ctx = document.getElementById('chart-grade').getContext('2d');
+  _charts['grade'] = new Chart(ctx,{
+    type:'bar',
+    data:{ labels:s.map(c=>c.subject.length>14?c.subject.slice(0,14)+'…':c.subject),
+      datasets:[
+        {label:'PSA 8', data:s.map(c=>c.collectr_psa8||null),  backgroundColor:'rgba(255,152,0,.70)', borderRadius:2},
+        {label:'PSA 9', data:s.map(c=>c.collectr_psa9||null),  backgroundColor:'rgba(33,150,243,.70)',borderRadius:2},
+        {label:'PSA 10',data:s.map(c=>c.collectr_psa10||null), backgroundColor:'rgba(76,175,80,.85)', borderRadius:2},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10},padding:10}},
+        tooltip:{callbacks:{
+          label:ci=>` ${ci.dataset.label}: ฿${fmt(ci.raw)}`,
+          afterBody:(items)=>{
+            const c=s[items[0].dataIndex];
+            const sp=(c.collectr_psa10||0)-(c.collectr_psa8||0);
+            return sp>0?[`  Grade spread PSA8→PSA10: ฿${fmt(sp)}`]:[];
+          }
+        }}
+      },
+      scales:{
+        x:{ticks:{font:{size:9},maxRotation:35},grid:{display:false}},
+        y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{callback:v=>'฿'+fmt(v)}}
+      }
+    }
+  });
+}
+
+/* Signal Intelligence cards */
+function _signalIntel(cards) {
+  const grp = {BUY:[],HOLD:[],SELL:[],REVIEW:[]};
+  cards.forEach(c=>{ (grp[c.signal]||grp.REVIEW).push(c); });
+  const INFO = {
+    BUY:   {icon:'🚀', sub:'Strong upside — consider adding'},
+    HOLD:  {icon:'⚓',     sub:'Stable — maintain position'},
+    SELL:  {icon:'📉', sub:'Underwater — review exit'},
+    REVIEW:{icon:'🔍', sub:'Low confidence — verify manually'},
+  };
+  $('signal-intel').innerHTML = ['BUY','HOLD','SELL','REVIEW'].map(sig=>{
+    const col=SIG_C[sig], inf=INFO[sig], items=grp[sig];
+    const body = items.length===0
+      ? '<div class="sig-empty">No cards in this category</div>'
+      : items.map(c=>{
+          const pc=c.pnl_pct>0?'num-pos':(c.pnl_pct<0?'num-neg':'num-neu');
+          const lk=c.collectr_url
+            ?`<a class="sig-item-link" href="${c.collectr_url}" target="_blank" rel="noopener">View on Collectr ↗</a>`:'';
+          return `<div class="sig-item">
+            <div class="ct-wrap" style="gap:10px;align-items:flex-start">
+              <span class="ct-lg">${cardThumb(c)}</span>
+              <div style="flex:1;min-width:0">
+                <div class="sig-item-top">
+                  <span class="sig-item-name">${c.subject}<span style="font-weight:400;color:var(--muted);font-size:10px"> PSA${c.grade}</span></span>
+                  <span class="sig-item-pnl ${pc}">${fmtPct(c.pnl_pct)}</span>
+                </div>
+                <div class="sig-item-expl">${c.explanation||'—'}</div>${lk}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+    return `<div class="sig-card">
+      <div class="sig-card-hdr" style="background:${col}">
+        <div><div class="sig-title">${inf.icon} ${sig}</div><div class="sig-card-sub">${inf.sub}</div></div>
+        <div class="sig-count">${items.length}</div>
+      </div>
+      <div class="sig-card-body">${body}</div>
+    </div>`;
+  }).join('');
+}
+
+/* Market price table */
+function _mktTable(cards) {
+  const s = [...cards].sort((a,b)=>(b.market_value||0)-(a.market_value||0));
+  $('mkt-body').innerHTML = s.map((c,i)=>{
+    const pc=c.pnl_pct>0?'num-pos':(c.pnl_pct<0?'num-neg':'num-neu');
+    const p8 =c.collectr_psa8 ?`<span class="grade-pill" style="background:#FFF3E0;color:#E65100">P8 ฿${fmt(c.collectr_psa8)}</span>`:'';
+    const p9 =c.collectr_psa9 ?`<span class="grade-pill" style="background:#E3F2FD;color:#0D47A1">P9 ฿${fmt(c.collectr_psa9)}</span>`:'';
+    const p10=c.collectr_psa10?`<span class="grade-pill" style="background:#E8F5E9;color:#1B5E20">P10 ฿${fmt(c.collectr_psa10)}</span>`:'';
+    const lk =c.collectr_url
+      ?`<a class="clink" href="${c.collectr_url}" target="_blank" rel="noopener">View ↗</a>`
+      :'<span style="color:var(--muted)">—</span>';
+    return `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><div class="ct-wrap"><span class="ct-sm">${cardThumb(c)}</span><div class="ct-info"><b>${c.subject}</b><br><span style="color:var(--muted);font-size:10px">PSA${c.grade} · #${c.card_number} · ${c.year||''}</span></div></div></td>
+      <td style="font-weight:700">PSA ${c.grade}</td>
+      <td>${c.my_cost?'฿'+fmt(c.my_cost):'—'}</td>
+      <td><b>${c.collectr_price?'฿'+fmt(c.collectr_price):'—'}</b>
+          ${c.psa_estimate?'<br><span style="font-size:10px;color:var(--muted)">Est ฿'+fmt(c.psa_estimate)+'</span>':''}</td>
+      <td style="color:var(--muted)">${c.psa_estimate?'฿'+fmt(c.psa_estimate):'—'}</td>
+      <td class="${pc}">${fmt(c.pnl)}</td>
+      <td class="${pc}" style="font-weight:700">${fmtPct(c.pnl_pct)}</td>
+      <td><div class="mkt-grade-cell">${p8||''}${p9||''}${p10||''}${!p8&&!p9&&!p10?'<span style="color:var(--muted)">—</span>':''}</div></td>
+      <td>${badge(c.signal,c.signal_color)}</td>
+      <td>${lk}</td>
+    </tr>`;
+  }).join('');
+}
+
+
+/* ── Portfolio sort state ─────────────────────────────────────────────── */
+let _portCards = [];
+let _portSortKey = null;
+let _portSortDir = 'asc';
+
+const SIGNAL_ORDER = { BUY: 1, HOLD: 2, REVIEW: 3, SELL: 4 };
+const RISK_ORDER   = { LOW: 1, MEDIUM: 2, HIGH: 3 };
+
+function sortPort(th) {
+  const key = th.dataset.key;
+  if (_portSortKey === key) {
+    _portSortDir = _portSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _portSortKey = key;
+    _portSortDir = 'asc';
+  }
+  document.querySelectorAll('#portfolio-table thead th.sortable').forEach(h => {
+    h.classList.remove('sort-asc', 'sort-desc');
+    h.querySelector('.sort-arr').textContent = '↕';
+  });
+  th.classList.add(_portSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  th.querySelector('.sort-arr').textContent = _portSortDir === 'asc' ? '▲' : '▼';
+  _renderPortfolioRows();
+}
+
+function _getSortVal(c, key) {
+  if (key === '__idx')      return c.__idx;
+  if (key === 'signal')     return SIGNAL_ORDER[c.signal] ?? 99;
+  if (key === 'risk_level') return RISK_ORDER[c.risk_level] ?? 99;
+  const v = c[key];
+  return v == null ? -Infinity : v;
+}
+
+function _renderPortfolioRows() {
+  let cards = [..._portCards];
+  if (_portSortKey) {
+    cards.sort((a, b) => {
+      const va = _getSortVal(a, _portSortKey);
+      const vb = _getSortVal(b, _portSortKey);
+      let cmp = 0;
+      if (typeof va === 'number' && typeof vb === 'number') {
+        cmp = va - vb;
+      } else {
+        cmp = String(va).localeCompare(String(vb), undefined, { numeric: true });
+      }
+      return _portSortDir === 'asc' ? cmp : -cmp;
+    });
+  }
+  $('portfolio-body').innerHTML = cards.map((c, i) =>
+    `<tr>
+      <td style="color:var(--muted)">${_portSortKey ? i+1 : c.__idx+1}</td>
+      <td>${cardName(c, true)}</td>
+      <td style="font-size:12px">${c.set_code||''}<br><span style="color:var(--muted)">${c.year||''}</span></td>
+      <td style="color:var(--muted)">#${c.card_number}</td>
+      <td style="font-weight:700">PSA ${c.grade}</td>
+      <td>${fmt(c.my_cost)}</td>
+      <td><b>${fmt(c.market_value)}</b></td>
+      <td class="${pnlClass(c.pnl)}">${fmt(c.pnl)}</td>
+      <td class="${pnlClass(c.pnl_pct)}">${fmtPct(c.pnl_pct)}</td>
+      <td style="color:var(--muted)">${c.confidence != null ? c.confidence + '%' : '—'}</td>
+      <td>${badge(c.signal, c.signal_color)}</td>
+      <td><span style="color:${c.risk_color};font-weight:600;font-size:12px" title="${c.risk_level}">${c.risk_level}</span></td>
+    </tr>`
+  ).join('');
+}
+
+/* ── Portfolio table ──────────────────────────────────────────────────── */
+function renderPortfolio(cards) {
+  if (!cards.length) return;
+  _portCards = cards.map((c, i) => ({ ...c, __idx: i }));
+  _portSortKey = null;
+  _portSortDir = 'asc';
+  document.querySelectorAll('#portfolio-table thead th.sortable').forEach(h => {
+    h.classList.remove('sort-asc', 'sort-desc');
+    h.querySelector('.sort-arr').textContent = '↕';
+  });
+  _renderPortfolioRows();
+  $('portfolio-empty').style.display = 'none';
+  $('portfolio-content').style.display = 'block';
+}
+
+/* ── Legend toggle ────────────────────────────────────────────────────── */
+function toggleLegend() {
+  const body    = $('legend-body');
+  const hdr     = $('legend-hdr');
+  const chevron = $('legend-chevron');
+  const isOpen  = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  hdr.classList.toggle('open', !isOpen);
+  chevron.classList.toggle('open', !isOpen);
+}
+
+/* ── Collectr table ───────────────────────────────────────────────────── */
+function renderCollectr(cards) {
+  if (!cards.length) return;
+  $('collectr-body').innerHTML = cards.map((c, i) =>
+    `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td>${cardName(c, false)}</td>
+      <td style="color:var(--muted)">#${c.card_number}</td>
+      <td style="font-weight:700">PSA ${c.grade}</td>
+      <td><b>${c.collectr_price ? '฿' + fmt(c.collectr_price) : '—'}</b></td>
+      <td>${c.psa_estimate ? '฿' + fmt(c.psa_estimate) : '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${c.collectr_source||'—'}</td>
+      <td>${c.collectr_url
+        ? `<a class="clink" href="${c.collectr_url}" target="_blank" rel="noopener">View ↗</a>`
+        : '<span style="color:var(--muted)">—</span>'}</td>
+    </tr>`
+  ).join('');
+  $('collectr-empty').style.display = 'none';
+  $('collectr-content').style.display = 'block';
+}
+
+/* ── Insights ──────────────────────────────────────────────────────────── */
+function insTable(cards, key) {
+  if (!cards || !cards.length) return '<p style="color:var(--muted);font-size:13px">No data.</p>';
+  return cards.map(c => {
+    const sig = c.signal_data || {};
+    const val = key === 'upside' ? fmtPct(sig.upside_pct) : '฿' + fmt(c.my_cost);
+    const cls = key === 'upside' ? pnlClass(sig.upside_pct) : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;
+                        padding:9px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <b style="font-size:13px">${c.subject}</b>
+        <span style="color:var(--muted);font-size:11px;margin-left:6px">PSA ${c.grade} · #${c.card_number}</span>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${sig.explanation||''}</div>
+      </div>
+      <span class="${cls}" style="font-size:14px;font-weight:700;white-space:nowrap;margin-left:12px">${val}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderInsights(ins) {
+  if (!ins || !Object.keys(ins).length) return;
+  $('ins-gainers').innerHTML     = insTable(ins.top_gainers,     'cost');
+  $('ins-undervalued').innerHTML = insTable(ins.top_undervalued, 'upside');
+  $('ins-weak').innerHTML        = insTable(ins.weak_positions,  'upside');
+  $('ins-risk').innerHTML        = insTable(ins.high_risk,       'upside');
+  $('insights-empty').style.display = 'none';
+  $('insights-content').style.display = 'block';
+}
+
+/* ── Exceptions ────────────────────────────────────────────────────────── */
+function renderExceptions(excs) {
+  if (excs.length === 0) {
+    $('exceptions-empty').style.display = 'block';
+    $('exceptions-content').style.display = 'none';
+    return;
+  }
+  $('exc-list').innerHTML = excs.map(e =>
+    `<div class="exc-item"><b>Row ${e.row}</b> [${e.step||''}]: ${e.error}</div>`
+  ).join('');
+  $('exceptions-empty').style.display = 'none';
+  $('exceptions-content').style.display = 'block';
+}
+
+/* ── Claude Haiku AI Summary ─────────────────────────────────────────── */
+async function fetchAISummary(data) {
+  const box    = $('ai-insight-box');
+  const body   = $('ai-box-body');
+  const loading= $('ai-loading');
+  const textEl = $('ai-text');
+  const footer = $('ai-footer');
+
+  box.style.display = 'block';
+  loading.style.display = 'flex';
+  textEl.style.display  = 'none';
+  footer.style.display  = 'none';
+  textEl.innerHTML      = '';
+
+  try {
+    const res = await fetch('/api/ai-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ portfolio: data.portfolio, summary: data.summary }),
+    });
+    const j = await res.json();
+    if (j.status !== 'success') throw new Error(j.message || 'AI error');
+
+    let txt = j.text || '';
+    txt = txt.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    txt = txt.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+
+    loading.style.display = 'none';
+    textEl.innerHTML = txt;
+    textEl.style.display = 'block';
+    footer.style.display = 'block';
+    body.scrollTop = 0;
+
+  } catch (e) {
+    loading.style.display = 'none';
+    textEl.textContent = '⚠️ AI briefing unavailable: ' + e.message +
+      '\n\nEnsure ANTHROPIC_API_KEY is set in your environment.';
+    textEl.style.display = 'block';
+  }
+}
+
+/* ── P&L Performance Dashboard ────────────────────────────────────────────── */
+/* Reads from _portCards — shared single source of truth with Portfolio tab */
+
+const pnlApp = {
+  scenarios: {},
+  fmt(n, d=0) { return n.toLocaleString('th-TH', {minimumFractionDigits: d, maximumFractionDigits: d}); },
+  getSignalColor(signal) {
+    return {BUY: '#4CAF50', HOLD: '#2196F3', SELL: '#F44336', REVIEW: '#FF9800'}[signal] || '#999';
+  },
+  getPortfolioCards() {
+    return _portCards || [];
+  },
+  applyScenario(card) {
+    let cost = card.my_cost;
+    let value = card.market_value;
+    if (this.scenarios.bull) value *= 1.30;
+    if (this.scenarios.bear) value *= 0.75;
+    if (this.scenarios.pop) value *= 0.85;
+    if (this.scenarios.grade && card.grade < 10) value *= 1.08;
+    if (this.scenarios['jpy-up']) value *= 1.10;
+    if (this.scenarios['jpy-down']) value *= 0.90;
+    if (this.scenarios.liq) value *= 0.85;
+    return {cost, value};
+  },
+  metrics() {
+    const cards = this.getPortfolioCards();
+    let nav = 0, cost = 0, winners = 0, losers = 0, confSum = 0, maxMarket = 0;
+    cards.forEach(c => {
+      const adj = this.applyScenario(c);
+      nav += adj.value;
+      cost += adj.cost;
+      if (c.market_value > c.my_cost) winners++;
+      if (c.market_value < c.my_cost) losers++;
+      confSum += (c.confidence || 0);
+      maxMarket = Math.max(maxMarket, adj.value);
+    });
+    const pnl = nav - cost;
+    const pnl_pct = (cost > 0) ? (pnl / cost) * 100 : 0;
+    const avgConf = cards.length > 0 ? confSum / cards.length : 0;
+    const topConc = nav > 0 ? (maxMarket / nav) * 100 : 0;
+    const alerts = cards.filter(c => {
+      const subject = cardName(c, false);
+      const isHighPop = (c.pop_growth || 0) > 10;
+      return isHighPop;
+    }).length;
+    return {nav, cost, pnl, pnl_pct, winners, losers, avgConf, topConc, alerts};
+  },
+  updateKPIs() {
+    const m = this.metrics();
+    const navEl = document.getElementById('kpi-nav');
+    navEl.textContent = this.fmt(m.nav);
+    const pnlEl = document.getElementById('kpi-pnl');
+    pnlEl.textContent = this.fmt(m.pnl);
+    pnlEl.className = 'pnl-kpi-value ' + (m.pnl >= 0 ? 'positive' : 'negative');
+    document.getElementById('kpi-pnl-pct').textContent = (m.pnl_pct >= 0 ? '+' : '') + m.pnl_pct.toFixed(1) + '%';
+    document.getElementById('kpi-winners').textContent = m.winners;
+    document.getElementById('kpi-losers').textContent = m.losers;
+    document.getElementById('kpi-avg-conf').textContent = m.avgConf.toFixed(0) + '%';
+    document.getElementById('kpi-top-conc').textContent = m.topConc.toFixed(1) + '%';
+    document.getElementById('kpi-alerts').textContent = m.alerts;
+  },
+  drawWinnersLosers() {
+    const cards = this.getPortfolioCards();
+    const pnlData = cards.map(c => ({
+      subject: cardName(c, false),
+      card: c,
+      pnl: (this.applyScenario(c).value - c.my_cost)
+    })).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
+    const top5Winners = pnlData.filter(x => x.pnl >= 0).slice(0, 5);
+    const top5Losers = pnlData.filter(x => x.pnl < 0).slice(0, 5);
+    const labels = [...top5Winners.map(x => x.subject).reverse(), ...top5Losers.map(x => x.subject)];
+    const data = [...top5Winners.map(x => x.pnl).reverse(), ...top5Losers.map(x => x.pnl)];
+    const colors = [...top5Winners.map(x => '#4CAF50').reverse(), ...top5Losers.map(x => '#F44336')];
+    const ctx = document.getElementById('chart-winnerslosers').getContext('2d');
+    if (this.chartWL) {
+      this.chartWL.data.labels = labels;
+      this.chartWL.data.datasets[0].data = data;
+      this.chartWL.data.datasets[0].backgroundColor = colors;
+      this.chartWL.update();
+    } else {
+      this.chartWL = new Chart(ctx, {
+        type: 'bar',
+        data: {labels, datasets: [{data, backgroundColor: colors, borderRadius: 4}]},
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {display: false},
+            tooltip: {callbacks: {label: (ctx) => '฿' + this.fmt(ctx.parsed.x)}}
+          },
+          scales: {x: {beginAtZero: true}}
+        }
+      });
+    }
+    document.querySelectorAll('#chart-winnerslosers').forEach(el => {
+      el.onclick = (e) => {
+        const canvasRect = el.getBoundingClientRect();
+        const x = e.clientX - canvasRect.left;
+        const y = e.clientY - canvasRect.top;
+        const canvasPos = Chart.helpers.getRelativePosition(e, this.chartWL);
+        const dataX = this.chartWL.scales.y.getValueForPixel(canvasPos.y);
+        const idx = labels.indexOf(dataX);
+        if (idx >= 0) {
+          const card = top5Winners[idx]?.card || top5Losers[idx - top5Winners.length]?.card;
+          if (card) this.goToCard(card);
+        }
+      };
+    });
+  },
+  drawCostValue() {
+    const cards = this.getPortfolioCards();
+    const data = cards.map(c => ({
+      subject: cardName(c, false),
+      card: c,
+      x: c.my_cost,
+      y: this.applyScenario(c).value,
+      r: this.applyScenario(c).value / 100,
+      color: this.getSignalColor(c.signal)
+    }));
+    const ctx = document.getElementById('chart-costvalue').getContext('2d');
+    if (this.chartCV) {
+      this.chartCV.data.datasets[0].data = data;
+      this.chartCV.update();
+    } else {
+      this.chartCV = new Chart(ctx, {
+        type: 'bubble',
+        data: {
+          datasets: [{
+            label: 'Cards',
+            data: data.map(d => ({x: d.x, y: d.y, r: d.r})),
+            backgroundColor: data.map(d => d.color)
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {display: false},
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const d = data[ctx.dataIndex];
+                  return `${d.subject}: Cost ฿${this.fmt(d.x)}, Market ฿${this.fmt(d.y)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {title: {display: true, text: 'Cost (฿)'}},
+            y: {title: {display: true, text: 'Market Value (฿)'}}
+          }
+        }
+      });
+    }
+    document.getElementById('chart-costvalue').onclick = (e) => {
+      const canvasRect = e.target.getBoundingClientRect();
+      const rect = this.chartCV.canvas.getBoundingClientRect();
+      const scaleX = this.chartCV.canvas.width / rect.width;
+      const scaleY = this.chartCV.canvas.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      const canvasPos = Chart.helpers.getRelativePosition(e, this.chartCV);
+      if (canvasPos) {
+        const xVal = this.chartCV.scales.x.getValueForPixel(canvasPos.x);
+        const idx = data.findIndex(d => Math.abs(d.x - xVal) < 500);
+        if (idx >= 0) this.goToCard(data[idx].card);
+      }
+    };
+  },
+  drawSignals() {
+    const cards = this.getPortfolioCards();
+    const signalCounts = {BUY: 0, HOLD: 0, SELL: 0, REVIEW: 0};
+    cards.forEach(c => {
+      signalCounts[c.signal || 'REVIEW']++;
+    });
+    const labels = Object.keys(signalCounts);
+    const dataCounts = labels.map(s => signalCounts[s]);
+    const colors = labels.map(s => this.getSignalColor(s));
+    const ctx = document.getElementById('chart-signals').getContext('2d');
+    if (this.chartSig) {
+      this.chartSig.data.labels = labels;
+      this.chartSig.data.datasets[0].data = dataCounts;
+      this.chartSig.data.datasets[0].backgroundColor = colors;
+      this.chartSig.update();
+    } else {
+      this.chartSig = new Chart(ctx, {
+        type: 'doughnut',
+        data: {labels, datasets: [{data: dataCounts, backgroundColor: colors}]},
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {legend: {position: 'bottom'}}
+        }
+      });
+    }
+  },
+  updateScenarioImpact() {
+    const baseMetrics = (() => {
+      const cards = this.getPortfolioCards();
+      let nav = cards.reduce((s, c) => s + c.market_value, 0);
+      let cost = cards.reduce((s, c) => s + c.my_cost, 0);
+      return {nav, pnl: nav - cost};
+    })();
+    const m = this.metrics();
+    const navDelta = m.nav - baseMetrics.nav;
+    const pnlDelta = m.pnl - baseMetrics.pnl;
+    const isActive = Object.values(this.scenarios).some(v => v);
+    const impactEl = document.getElementById('pnl-scenario-impact');
+    if (isActive) {
+      impactEl.style.display = 'block';
+      document.getElementById('scenario-nav-delta').textContent = (navDelta >= 0 ? '+' : '') + this.fmt(navDelta) + ' ฿';
+      document.getElementById('scenario-pnl-delta').textContent = (pnlDelta >= 0 ? '+' : '') + this.fmt(pnlDelta) + ' ฿';
+    } else {
+      impactEl.style.display = 'none';
+    }
+  },
+  updateActionTable() {
+    const cards = this.getPortfolioCards();
+    const rows = cards.map(c => {
+      const adj = this.applyScenario(c);
+      const pnl = adj.value - c.my_cost;
+      const pnl_pct = (c.my_cost > 0) ? (pnl / c.my_cost) * 100 : 0;
+      let action = 'HOLD';
+      if (c.signal === 'BUY') action = 'BUY';
+      else if (c.signal === 'SELL') action = 'SELL';
+      else if (c.signal === 'REVIEW') action = 'REVIEW';
+      return {card: c, subject: cardName(c, false), cost: c.my_cost, value: adj.value, pnl, pnl_pct, signal: c.signal, action};
+    });
+    const html = rows.map(r => `
+      <tr style="border-bottom:1px solid var(--border);cursor:pointer">
+        <td style="padding:8px">${r.subject}</td>
+        <td style="padding:8px;text-align:right">${this.fmt(r.cost)}</td>
+        <td style="padding:8px;text-align:right"><b>${this.fmt(r.value)}</b></td>
+        <td style="padding:8px;text-align:right;color:${r.pnl >= 0 ? 'var(--green)' : 'var(--red)'}">${(r.pnl >= 0 ? '+' : '')}${this.fmt(r.pnl)}</td>
+        <td style="padding:8px;text-align:right;color:${r.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)'}">${(r.pnl_pct >= 0 ? '+' : '')}${r.pnl_pct.toFixed(1)}%</td>
+        <td style="padding:8px;text-align:center"><span style="background:${this.getSignalColor(r.signal)};color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600">${r.signal}</span></td>
+        <td style="padding:8px;text-align:center"><span style="background:${this.getSignalColor(r.action)};color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600">${r.action}</span></td>
+      </tr>
+    `).join('');
+    document.getElementById('action-table-body').innerHTML = html;
+    const tbody = document.getElementById('action-table-body');
+    tbody.querySelectorAll('tr').forEach((tr, idx) => {
+      tr.addEventListener('click', () => {
+        if (idx < rows.length) this.goToCard(rows[idx].card);
+      });
+    });
+  },
+  goToCard(card) {
+    switchTab('portfolio');
+    setTimeout(() => {
+      const subject = cardName(card, false);
+      const rows = document.querySelectorAll('#portfolio-body tr');
+      rows.forEach(row => {
+        const subjectCell = row.children[1]?.textContent || '';
+        if (subjectCell.includes(subject)) {
+          row.scrollIntoView({behavior: 'smooth', block: 'center'});
+          row.style.backgroundColor = '#ffffcc';
+          setTimeout(() => row.style.backgroundColor = '', 2000);
+        }
+      });
+    }, 100);
+  },
+  updateAll() {
+    const hasData = (this.getPortfolioCards() || []).length > 0;
+    // Toggle the three "Visit the Dashboard tab…" overlays based on whether
+    // _portCards is populated. Charts stay fully rendered when data exists.
+    ['empty-winnerslosers','empty-costvalue','empty-signals'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = hasData ? 'none' : 'flex';
+    });
+    this.updateKPIs();
+    this.drawWinnersLosers();
+    this.drawCostValue();
+    this.drawSignals();
+    this.updateScenarioImpact();
+    this.updateActionTable();
+  },
+  resetScenarios() {
+    this.scenarios = {};
+    document.querySelectorAll('[data-scenario]').forEach(el => el.checked = false);
+    this.updateAll();
+  },
+  init() {
+    this.updateAll();
+    document.querySelectorAll('[data-scenario]').forEach(el => {
+      el.addEventListener('change', (e) => {
+        this.scenarios[e.target.dataset.scenario] = e.target.checked;
+        this.updateAll();
+      });
+    });
+  }
+};
+
+// Initialize P&L dashboard when tab becomes active
+const origSwitchTab = window.switchTab;
+window.switchTab = function(tabName) {
+  origSwitchTab(tabName);
+  if (tabName === 'pnl-performance') {
+    if (!pnlApp.initialized) {
+      pnlApp.initialized = true;
+      setTimeout(() => pnlApp.init(), 100);
+    } else {
+      setTimeout(() => pnlApp.updateAll(), 50);
+    }
+  }
+};
+
+// Keep P&L tab in sync whenever the Portfolio feed refreshes _portCards.
+(function(){
+  const _origRP = window.renderPortfolio;
+  if (typeof _origRP === 'function') {
+    window.renderPortfolio = function(cards) {
+      _origRP(cards);
+      if (window.pnlApp && pnlApp.initialized) {
+        try { pnlApp.updateAll(); } catch(e) { console.warn('pnlApp.updateAll failed:', e); }
+      }
+    };
+  }
+})();
+
+</script>
+</body>
+</html>
