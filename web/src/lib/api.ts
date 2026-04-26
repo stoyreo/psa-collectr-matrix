@@ -39,6 +39,9 @@ export async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): 
   const url = `${API_BASE}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
+    // Bypass ngrok-free.dev abuse warning page which otherwise
+    // intercepts the browser fetch and returns its HTML interstitial.
+    'ngrok-skip-browser-warning': '1',
     ...(API_KEY && { 'X-Tracer-Key': API_KEY }),
     ...options.headers,
   };
@@ -53,8 +56,23 @@ export async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): 
   return response.json();
 }
 
-export function getPortfolio() {
-  return fetchAPI<ApiResponse>('/api/status');
+export async function getPortfolio(): Promise<ApiResponse> {
+  try {
+    return await fetchAPI<ApiResponse>('/api/status');
+  } catch (error) {
+    // Fallback to snapshot when live backend is unreachable
+    console.warn('Live backend unreachable, falling back to snapshot...', error);
+    try {
+      const snapshot = await fetch('/snapshot.json').then(r => r.json());
+      return {
+        ...snapshot,
+        data_source: 'snapshot',
+      };
+    } catch (snapshotError) {
+      console.error('Snapshot fallback also failed:', snapshotError);
+      throw error; // Re-throw original error
+    }
+  }
 }
 
 export function refreshPortfolio() {
