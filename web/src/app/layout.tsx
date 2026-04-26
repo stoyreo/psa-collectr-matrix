@@ -1,10 +1,45 @@
+'use client';
+
 import type { Metadata } from 'next';
+import { useEffect, useState } from 'react';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: 'PSA × Collectr Tracer',
-  description: 'Portfolio Intelligence for PSA-Graded Pokemon Cards',
-};
+// export const metadata: Metadata = {
+//   title: 'PSA × Collectr Tracer',
+//   description: 'Portfolio Intelligence for PSA-Graded Pokemon Cards',
+// };
+
+function StatusPill() {
+  const [status, setStatus] = useState<'live' | 'snapshot' | 'unknown'>('unknown');
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const response = await fetch('/api/health', { method: 'GET' });
+        if (response.ok) {
+          setStatus('live');
+        } else {
+          setStatus('snapshot');
+        }
+      } catch {
+        setStatus('snapshot');
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const statusColor = status === 'live' ? 'bg-green-100 text-green-800' : status === 'snapshot' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800';
+  const statusDot = status === 'live' ? '🟢' : status === 'snapshot' ? '🟡' : '⚪';
+
+  return (
+    <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColor}`}>
+      {statusDot} {status === 'live' ? 'Live' : status === 'snapshot' ? 'Snapshot' : 'Checking...'}
+    </span>
+  );
+}
 
 export default function RootLayout({
   children,
@@ -24,7 +59,10 @@ export default function RootLayout({
           {children}
         </main>
         <footer className="bg-gray-100 border-t border-gray-200 mt-12 py-4 text-center text-sm text-gray-600">
-          <p>Phase C: Vercel Hybrid Migration | ngrok tunnel active</p>
+          <div className="flex items-center justify-center gap-4">
+            <p>Phase C: Vercel Hybrid Migration</p>
+            <StatusPill />
+          </div>
         </footer>
       </body>
     </html>

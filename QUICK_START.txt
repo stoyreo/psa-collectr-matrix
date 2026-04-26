@@ -1,0 +1,138 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                          QUICK START GUIDE                                ║
+║              PSA × Collectr Tracer — Portfolio Intelligence               ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Install ngrok (if not already installed)                       │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Option A - Direct Download (Recommended):
+  1. Download: https://ngrok.com/download
+  2. Select: Windows → 64-bit → Download
+  3. Extract ngrok.exe to THIS FOLDER
+  4. Verify: Open Command Prompt and type "ngrok --version"
+
+Option B - Package Manager:
+  • Chocolatey: choco install ngrok
+  • Scoop: scoop install ngrok
+  • Windows Package Manager: winget install ngrok
+
+Option C - Skip ngrok (use snapshot mode only):
+  → Run: START_SNAPSHOT_ONLY.bat (read-only, no live backend)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: Start the Application                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+With ngrok (Full functionality):
+  → Double-click: START_EVERYTHING.bat
+  → Waits for Flask to start (5-10 seconds)
+  → Waits for ngrok tunnel (10-30 seconds)
+  → Opens Vercel dashboard automatically
+  → Shows green status (live) or amber (snapshot)
+
+Without ngrok (Snapshot only):
+  → Double-click: START_SNAPSHOT_ONLY.bat
+  → Starts Flask only
+  → Shows amber status (snapshot/read-only)
+  → No live backend connectivity
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: Access Your Dashboard                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Open your browser to:
+  https://psa-collectr-matrix.vercel.app
+
+You should see:
+  ✓ Dashboard with your portfolio
+  ✓ Card list with P&L
+  ✓ Status indicator (green=live, amber=snapshot)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ TROUBLESHOOTING                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Run diagnostic tool:
+  → Double-click: DIAGNOSE_NGROK.bat
+
+This checks:
+  • ngrok installation
+  • ngrok authentication
+  • Flask connectivity
+  • Tunnel status
+
+Read detailed guide:
+  → Open: NGROK_SETUP_GUIDE.md
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ KEY FILES                                                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Startup Scripts:
+  • START_EVERYTHING.bat ................ Full stack (Flask + ngrok)
+  • START_SNAPSHOT_ONLY.bat ............. Flask only (snapshot mode)
+  • DIAGNOSE_NGROK.bat .................. Check ngrok installation
+
+Manual Runners:
+  • RUN_FLASK.bat ....................... Start Flask backend only
+  • RUN_TUNNEL.bat ...................... Start ngrok tunnel only
+  • SETUP_NGROK.bat ..................... Help with ngrok installation
+
+Documentation:
+  • QUICK_START.txt ..................... This file
+  • NGROK_SETUP_GUIDE.md ................ Detailed setup instructions
+  • MIGRATION_REPORT.md ................. Technical architecture
+
+Configuration:
+  • .env ................................ Environment variables
+  • Portfolio_Master.xlsx ............... Your portfolio data
+  • web/public/snapshot.json ............ Cached snapshot
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ENVIRONMENT                                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Location:           Bangkok, Thailand
+Currency:           Thai Baht (฿)
+Flask Backend:      localhost:5000
+Vercel Frontend:    psa-collectr-matrix.vercel.app
+ngrok Tunnel:       automated-crummiest-puritan.ngrok-free.dev (if configured)
+Portfolio Source:   Portfolio_Master.xlsx
+Offline Fallback:   web/public/snapshot.json
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ COMMON ISSUES                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Issue: "ERROR: ngrok.exe not found"
+Fix:   Install ngrok using steps above
+
+Issue: "ERROR: ngrok failed to connect within 30 seconds"
+Fix:   • Check Flask is running (Flask window in taskbar)
+       • Check internet connection
+       • Run: DIAGNOSE_NGROK.bat
+       • Review: %USERPROFILE%\.ngrok2\ngrok.log
+
+Issue: "Failed to fetch" in Vercel dashboard
+Fix:   This is NORMAL - means Flask/ngrok not running
+       • Run START_EVERYTHING.bat or START_SNAPSHOT_ONLY.bat
+       • Wait for "All systems online!" message
+       • Refresh browser (Ctrl+R)
+
+Issue: Green status but no data shown
+Fix:   • Check Portfolio_Master.xlsx for data
+       • Run: python scripts/publish_snapshot.py
+       • Refresh browser
+
+Issue: Amber status (snapshot mode)
+Fix:   This is NORMAL if ngrok not configured
+       • Portfolio is read-only but still functional
+       • To get live backend, install ngrok and run START_EVERYTHING.bat
+
+═══════════════════════════════════════════════════════════════════════════
+
+Next Step: Double-click START_EVERYTHING.bat or START_SNAPSHOT_ONLY.bat
+
+═══════════════════════════════════════════════════════════════════════════

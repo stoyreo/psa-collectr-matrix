@@ -58,10 +58,26 @@ export default function Dashboard() {
     return <div className="text-center py-12 text-gray-500">No data loaded</div>;
   }
 
-  const { portfolio, summary, ts_display } = data;
+  const { portfolio, summary, ts_display, data_source } = data;
 
   return (
     <div className="space-y-8">
+      {data_source === 'snapshot' && (
+        <div className="bg-blue-50 border border-blue-300 rounded-lg p-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">Static snapshot from {ts_display}</h3>
+              <p className="text-sm text-blue-700 mt-1">Data is read-only. To update, run <code className="bg-blue-100 px-2 py-1 rounded text-xs font-mono">REFRESH_AND_PUSH.bat</code> locally.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Dashboard</h2>
         <div className="text-sm text-gray-600">

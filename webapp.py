@@ -27,11 +27,18 @@ app = Flask(__name__, template_folder=_tmpl_folder)
 app.logger.setLevel(logging.INFO)
 
 # ── Phase C: Enable CORS for Vercel Frontend ─────────────────────────────────
+# Allow both the canonical Vercel domain AND every preview/branch deployment
+# (matrix, tracer, *-techcraftlab.vercel.app, etc.) plus localhost for dev.
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["https://psa-collectr-tracer.vercel.app", "http://localhost:3000"],
+        # Use a regex string (flask-cors compiles it) to cover every
+        # psa-collectr-*.vercel.app deployment (matrix, tracer, previews).
+        "origins": [
+            r"https://psa-collectr-[a-z0-9\-]+\.vercel\.app",
+            "http://localhost:3000",
+        ],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "X-Tracer-Key"],
+        "allow_headers": ["Content-Type", "X-Tracer-Key", "ngrok-skip-browser-warning"],
         "supports_credentials": True,
     }
 })
@@ -929,6 +936,36 @@ def api_refresh():
         except Exception as e:
             app.logger.error(f"Refresh error: {e}", exc_info=True)
             return jsonify(status="error", message=str(e)), 500
+
+
+@app.route("/api/health")
+def api_health():
+    """Health check endpoint for monitoring Flask + tunnel status."""
+    try:
+        from pathlib import Path
+        master_path = Path(__file__).parent / "Portfolio_Master.xlsx"
+        excel_locked = False
+
+        # Check if Excel is locked by trying to open it
+        if master_path.exists():
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(str(master_path), data_only=True)
+                wb.close()
+            except Exception:
+                excel_locked = True
+
+        ngrok_domain = request.headers.get("Host", "unknown")
+
+        return jsonify({
+            "flask": "ok",
+            "excel_lock": excel_locked,
+            "ngrok_domain": ngrok_domain,
+            "ts": datetime.now().isoformat(),
+        })
+    except Exception as e:
+        app.logger.warning(f"Health check error: {e}")
+        return jsonify({"flask": "error", "message": str(e)}), 500
 
 # ── Add Card Routes ──────────────────────────────────────────────────────────
 

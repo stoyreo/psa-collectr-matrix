@@ -1,10 +1,7 @@
-// Default to a relative URL so the browser hits Vercel's same-origin
-// /api/[...path] proxy (web/src/app/api/[...path]/route.ts), which forwards
-// server-side to the ngrok-tunneled Flask backend with the ngrok-skip-
-// browser-warning header. Set NEXT_PUBLIC_API_BASE to override (e.g. for
-// local dev pointing directly at http://localhost:5000).
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
-const API_KEY = process.env.TRACER_API_KEY;
+/**
+ * Static snapshot client — reads from /snapshot.json (same-origin, no backend required).
+ * No Flask. No ngrok. No CORS. Pure static.
+ */
 
 export interface Portfolio {
   subject: string;
@@ -36,47 +33,18 @@ export interface ApiResponse {
   data_source: 'live' | 'snapshot';
 }
 
-export async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  // API_BASE === '' is fine — it means "use Vercel's same-origin proxy".
-  const url = `${API_BASE}${endpoint}`;
-  const headers = {
-    'Content-Type': 'application/json',
-    // Bypass ngrok-free.dev abuse warning page which otherwise
-    // intercepts the browser fetch and returns its HTML interstitial.
-    'ngrok-skip-browser-warning': '1',
-    ...(API_KEY && { 'X-Tracer-Key': API_KEY }),
-    ...options.headers,
-  };
-
-  const response = await fetch(url, { ...options, headers });
-
+export async function getPortfolio(): Promise<ApiResponse> {
+  const response = await fetch('/snapshot.json');
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `API error: ${response.status}`);
+    throw new Error(`Failed to load snapshot: ${response.status}`);
   }
-
   return response.json();
 }
 
-export async function getPortfolio(): Promise<ApiResponse> {
-  try {
-    return await fetchAPI<ApiResponse>('/api/status');
-  } catch (error) {
-    // Fallback to snapshot when live backend is unreachable
-    console.warn('Live backend unreachable, falling back to snapshot...', error);
-    try {
-      const snapshot = await fetch('/snapshot.json').then(r => r.json());
-      return {
-        ...snapshot,
-        data_source: 'snapshot',
-      };
-    } catch (snapshotError) {
-      console.error('Snapshot fallback also failed:', snapshotError);
-      throw error; // Re-throw original error
-    }
-  }
-}
-
+/**
+ * Snapshot is static — re-fetch the JSON without full page reload.
+ * To update, user must run REFRESH_AND_PUSH.bat locally.
+ */
 export function refreshPortfolio() {
-  return fetchAPI<ApiResponse>('/api/refresh', { method: 'POST' });
+  return getPortfolio();
 }

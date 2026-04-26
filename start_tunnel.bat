@@ -36,7 +36,7 @@ REM - Exposed on port 5000 (Flask backend)
 REM - Log to stdout so you can see the generated URL
 REM - Info log level to show connection details
 
-%NGROK% http 5000 --log=stdout --log-level=info
+%NGROK% http 5000 --domain=automated-crummiest-puritan.ngrok-free.dev --log=stdout --log-level=info
 
 REM After ngrok starts, you'll see output like:
 REM   Session started successfully at https://abc-123-def.ngrok-free.app
