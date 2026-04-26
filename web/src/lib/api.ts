@@ -1,4 +1,9 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+// Default to a relative URL so the browser hits Vercel's same-origin
+// /api/[...path] proxy (web/src/app/api/[...path]/route.ts), which forwards
+// server-side to the ngrok-tunneled Flask backend with the ngrok-skip-
+// browser-warning header. Set NEXT_PUBLIC_API_BASE to override (e.g. for
+// local dev pointing directly at http://localhost:5000).
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 const API_KEY = process.env.TRACER_API_KEY;
 
 export interface Portfolio {
@@ -32,10 +37,7 @@ export interface ApiResponse {
 }
 
 export async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  if (!API_BASE) {
-    throw new Error('NEXT_PUBLIC_API_BASE not configured');
-  }
-
+  // API_BASE === '' is fine — it means "use Vercel's same-origin proxy".
   const url = `${API_BASE}${endpoint}`;
   const headers = {
     'Content-Type': 'application/json',
